@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<program language="SOL26">
+  <class name="Main" parent="Object">
+    <method selector="run">
+      <block arity="0">
+        <assign order="1">
+          <var name="x"/>
+          <expr>
+            <literal class="Nil" value="nil"/>
+          </expr>
+        </assign>
+        <assign order="2">
+          <var name="y"/>
+          <expr>
+            <literal class="True" value="true"/>
+          </expr>
+        </assign>
+        <assign order="3">
+          <var name="z"/>
+          <expr>
+            <literal class="String" value="ahoj"/>
+          </expr>
+        </assign>
+        <assign order="4">
+          <var name="_"/>
+          <expr>
+            <send selector="print">
+              <expr>
+                <send selector="asString">
+                  <expr>
+                    <var name="x"/>
+                  </expr>
+                </send>
+              </expr>
+            </send>
+          </expr>
+        </assign>
+        <assign order="5">
+          <var name="q"/>
+          <expr>
+            <send selector="print">
+              <expr>
+                <literal class="String" value="tisk"/>
+              </expr>
+            </send>
+          </expr>
+        </assign>
+      </block>
+    </method>
+  </class>
+</program>

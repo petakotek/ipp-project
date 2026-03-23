@@ -18,12 +18,25 @@ namespace IPP\Interpreter;
 
 use DOMDocument;
 use DOMElement;
-use IPP\Interpreter\InputModel\Program;
-use IPP\Interpreter\InputModel\XmlValidationException;
-use IPP\Interpreter\Exception\InterpreterError;
+use IPP\Interpreter\Classes\ClassEntity;
+use IPP\Interpreter\Classes\Common\FalseEntity;
+use IPP\Interpreter\Classes\Common\IntegerEntity;
+use IPP\Interpreter\Classes\Common\NilEntity;
+use IPP\Interpreter\Classes\Common\StringEntity;
+use IPP\Interpreter\Classes\Common\TrueEntity;
+use IPP\Interpreter\Classes\MethodEntity;
+use IPP\Interpreter\Classes\ObjectEntity;
 use IPP\Interpreter\Exception\ErrorCode;
-use Psr\Log\NullLogger;
+use IPP\Interpreter\Exception\InterpreterError;
+use IPP\Interpreter\InputModel\ClassDef;
+use IPP\Interpreter\InputModel\Expr;
+use IPP\Interpreter\InputModel\Literal;
+use IPP\Interpreter\InputModel\Method;
+use IPP\Interpreter\InputModel\Program;
+use IPP\Interpreter\InputModel\Variable;
+use IPP\Interpreter\InputModel\XmlValidationException;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use SplFileObject;
 
 /**
@@ -82,23 +95,157 @@ class Interpreter
      */
     public function execute(?SplFileObject $inputIo): void
     {
-        if ($this->currentProgram === null) {
+        if ($this->currentProgram === null)
+        {
             throw new InterpreterError(ErrorCode::INT_OTHER, 'No program is loaded.');
         }
 
         $this->logger->info('Executing program');
 
-        foreach ($this->currentProgram->classes as $class) {
-            $this->logger->debug("Loaded classes: " . $class->name);
-            foreach ($class->methods as $method) {
-                $this->logger->debug("\tLoaded methods: " . $method->selector);
-            }
-        }
-
-        // Toto mam implementovat
-        // Template placeholder: implement interpretation logic here.
-
+        $this->parseClasses($this->currentProgram->classes);
         // testy kvality :
         // xkotekp00@LAPTOP-T421UQ1R:~/rocnik2/ipp/project/int$ vendor/bin/phpstan analyse src/
     }
+
+    /**
+     * Zpracuje kazdou tridu, zatim pouze jen Main tridu
+     * @param array<ClassDef> $classes
+     */
+    public function parseClasses(array $classes): void
+    {
+        $isMainClass = false;
+
+        // procházení všech tříd a nalezení třídy Main pro start programu
+        foreach ($classes as $class) {
+            if ($class->name == "Main" && $class->parent != ""){
+                $isMainClass = true;
+                $this->parseRunMethod($class->methods);
+            }
+        }
+
+        if (!$isMainClass){
+            // chybi trida Main
+            throw new InterpreterError(ErrorCode::SEM_MAIN);
+        }
+    }
+
+
+    /** @var array<string, object> $promenne */
+    public array $promenne = [];
+
+    /**
+     * Funkce na zpracování metody Run, odtud startuje hlavní chování programu
+     * @param array<Method> $methods
+     */
+    public function parseRunMethod(array $methods): void
+    {
+        $isRunMethod = false;
+        foreach ($methods as $method){
+            if ($method->selector == "run"){
+                $isRunMethod = true;
+                // zpracovani vsech prirazeni
+                foreach ($method->block->assigns as $assign){
+                    if ($assign->target->name == "_"){
+                        $this->parseExpression($assign->expr);
+                    }else {
+                        $this->promenne[$assign->target->name] = $this->parseExpression($assign->expr);
+                    }
+                }
+            }
+        }
+        if (!$isRunMethod){
+            // chybi metoda run
+            throw new InterpreterError(ErrorCode::SEM_MAIN);
+        }
+    }
+    // funkce zjisti jestli se jedna o literal, zaslani zpravy a podle toho pracuje
+    public function parseExpression(Expr $expr) : object
+    {
+        if ($expr->literal != null)
+        {   // kdyz vyrazem je literal
+            return $this->assignTo($expr->literal);
+        }else if ($expr->block != null)
+        {   // kdyz vyrazem bude block
+            return $this->assignTo($expr->block);
+        }else if ($expr->send != null)
+        {
+            // receiver je nejaky vyraz
+            return $this->sendMsg($expr->send->receiver, $expr->send->selector);
+        }else if ($expr->variable != null)
+        {
+            return $this->assignTo($expr->variable);
+        }
+        return new ObjectEntity();
+    }
+    // funkce vraci vytvoreny objekt
+    public function assignTo(object $object) : object
+    {
+        if ($object instanceof Literal)
+        {
+            if ($object->classId == "Integer")
+            {
+                return new IntegerEntity((int)$object->value);
+            }
+            if ($object->classId == "String")
+            {
+                return new StringEntity($object->value);
+            }
+            if ($object->classId == "True")
+            {
+                return new TrueEntity();
+            }
+            if ($object->classId == "False")
+            {
+                return new FalseEntity();
+            }
+            if ($object->classId == "Nil") {
+                return new NilEntity();
+            }
+
+        }
+        if ($object instanceof Variable)
+        {
+            if (array_key_exists($object->name, $this->promenne))
+            {
+                return $this->promenne[$object->name];
+            }else
+            {
+                // chyba, pouziti nedefinovane promenne
+                throw new InterpreterError(ErrorCode::SEM_UNDEF);
+            }
+        }
+        return new ObjectEntity();
+    }
+
+    ///
+    /// $receiver - vyraz, ktery se vyhodnoti na objekt, tento objekt je prijemcem zpravy
+    /// $selector - metoda, co budu hledat
+    /// ...$args - volitelne mnozstvi argumentuu
+    public function sendMsg(Expr $receiver,string $selector, ...$args): object {
+        // parseAssign pro receiver
+        $object = $this->parseExpression($receiver);
+        if ($object instanceof StringEntity){
+            switch ($selector){
+                case "asString":
+                    return $object->asString();
+                case "print":
+                    return $object->print();
+            }
+        }
+        if ($object instanceof IntegerEntity){
+            switch ($selector) {
+                case "asString":
+                    return $object->asString();
+                case "asInteger":
+                    return $object->asInteger();
+            }
+        }
+        if ($object instanceof NilEntity){
+            if ($selector == "asString") {
+                return $object->asString();
+            }
+        }
+        return $object;
+    }
+
 }
