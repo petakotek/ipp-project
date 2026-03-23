@@ -8,32 +8,45 @@ use IPP\Interpreter\Classes\Common\TrueEntity;
 
 class ObjectEntity
 {
-    public function __construct() {}
-    public function identicalTo(object $myself, object $target) : TrueEntity | FalseEntity{
-        if($myself instanceof $target) {
+    public function __construct()
+    {
+    }
+    public function identicalTo(object $target): TrueEntity | FalseEntity
+    {
+        if ($this instanceof $target) {
             return new TrueEntity();
         }
         return new FalseEntity();
     }
-//    public function equalTo(object $myself, object $target) : bool{
-//        if
-//    }
-    public function asString() : object{
+    public function equalTo(object $target): TrueEntity | FalseEntity
+    {
+        if ($target instanceof $this) {
+            return TrueEntity::getInstance();
+        }
+        return FalseEntity::getInstance();
+    }
+    public function asString(): object
+    {
         return new StringEntity('');
     }
-    public function isNumber() : bool{
-        return false;
+    public function isNumber(): FalseEntity | TrueEntity
+    {
+        return FalseEntity::getInstance();
     }
-    public function isString() : bool{
-        return false;
+    public function isString(): FalseEntity | TrueEntity
+    {
+        return FalseEntity::getInstance();
     }
-    public function isBlock() : bool{
-        return false;
+    public function isBlock(): FalseEntity | TrueEntity
+    {
+        return FalseEntity::getInstance();
     }
-    public function isNil() : bool{
-        return false;
+    public function isNil(): FalseEntity | TrueEntity
+    {
+        return FalseEntity::getInstance();
     }
-    public function isBoolean() : bool{
-        return false;
+    public function isBoolean(): FalseEntity | TrueEntity
+    {
+        return FalseEntity::getInstance();
     }
 }

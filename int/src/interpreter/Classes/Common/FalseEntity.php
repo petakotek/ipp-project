@@ -10,7 +10,8 @@ final class FalseEntity extends ObjectEntity
     private static array $instances = [];
     public bool $value = false;
 
-    protected function __construct(){
+    protected function __construct()
+    {
         parent::__construct();
     }
 
@@ -26,10 +27,12 @@ final class FalseEntity extends ObjectEntity
 
         return self::$instances[$cls];
     }
-    public function asString() : StringEntity {
+    public function asString(): StringEntity
+    {
         return new StringEntity('false');
     }
-    public function not(FalseEntity $cilovyObjekt) : bool{
+    public function not(FalseEntity $cilovyObjekt): bool
+    {
         return !$cilovyObjekt->value;
     }
 
@@ -41,12 +44,13 @@ final class FalseEntity extends ObjectEntity
 
 //    public function ifTrue(IntegerEntity $cilovyObjekt){}
 
-    public function isBoolean() : bool{
-        return true;
+    public function isBoolean(): TrueEntity
+    {
+        return TrueEntity::getInstance();
     }
 
     /// KONSTRUKTORY
-    public static function new(): static
+    public static function new(): FalseEntity
     {
         return new self();
     }

@@ -4,7 +4,6 @@ namespace IPP\Interpreter\Classes\Common;
 
 use IPP\Interpreter\Classes\ObjectEntity;
 
-
 final class TrueEntity extends ObjectEntity
 {
     /** @var array<TrueEntity> */
@@ -12,7 +11,8 @@ final class TrueEntity extends ObjectEntity
 
     public bool $value = true;
 
-    protected function __construct(){
+    protected function __construct()
+    {
         parent::__construct();
     }
 
@@ -30,10 +30,12 @@ final class TrueEntity extends ObjectEntity
         return self::$instances[$cls];
     }
 
-    public function asString() : object {
+    public function asString(): object
+    {
         return new StringEntity('true');
     }
-    public function not(TrueEntity $cilovyObjekt) : bool{
+    public function not(TrueEntity $cilovyObjekt): bool
+    {
         return !$cilovyObjekt->value;
     }
 
@@ -49,8 +51,9 @@ final class TrueEntity extends ObjectEntity
 
 //    public function ifTrue(IntegerEntity $cilovyObjekt){}
 
-    public function isBoolean() : bool{
-        return true;
+    public function isBoolean(): TrueEntity
+    {
+        return TrueEntity::getInstance();
     }
 
     /// KONSTRUKTORY
@@ -59,4 +62,3 @@ final class TrueEntity extends ObjectEntity
         return new self();
     }
 }
-

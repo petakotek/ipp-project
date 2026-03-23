@@ -94,13 +94,9 @@ class Interpreter
      */
     public function execute(?SplFileObject $inputIo): void
     {
-        if ($this->currentProgram === null)
-        {
+        if ($this->currentProgram === null) {
             throw new InterpreterError(ErrorCode::INT_OTHER, 'No program is loaded.');
         }
-
-        $this->logger->info('Executing program');
-
         $this->parseClasses($this->currentProgram->classes);
         // testy kvality :
         // xkotekp00@LAPTOP-T421UQ1R:~/rocnik2/ipp/project/int$ vendor/bin/phpstan analyse src/
@@ -116,21 +112,20 @@ class Interpreter
 
         // procházení všech tříd a nalezení třídy Main pro start programu
         foreach ($classes as $class) {
-            if ($class->name == "Main" && $class->parent != ""){
+            if ($class->name == "Main" && $class->parent != "") {
                 $isMainClass = true;
                 $this->parseRunMethod($class->methods);
             }
         }
 
-        if (!$isMainClass){
+        if (!$isMainClass) {
             // chybi trida Main
             throw new InterpreterError(ErrorCode::SEM_MAIN);
         }
     }
 
 
-    /** @var array<string, object> $promenne */
-    public array $promenne = [];
+
 
     /**
      * Funkce na zpracování metody Run, odtud startuje hlavní chování programu
@@ -138,64 +133,60 @@ class Interpreter
      */
     public function parseRunMethod(array $methods): void
     {
+        /** @var array<string, object> $promenneMain */
+        $lokalniPromenne = [];
+
         $isRunMethod = false;
-        foreach ($methods as $method){
-            if ($method->selector == "run"){
+        foreach ($methods as $method) {
+            if ($method->selector == "run") {
                 $isRunMethod = true;
                 // zpracovani vsech prirazeni
-                foreach ($method->block->assigns as $assign){
-                    if ($assign->target->name == "_"){
-                        $this->parseExpression($assign->expr);
-                    }else {
-                        $this->promenne[$assign->target->name] = $this->parseExpression($assign->expr);
+                foreach ($method->block->assigns as $assign) {
+                    if ($assign->target->name == "_") {
+                        $this->parseExpression($assign->expr, $methods, $lokalniPromenne);
+                    } else {
+                        $lokalniPromenne[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $lokalniPromenne);
                     }
                 }
             }
         }
-        var_dump($this->promenne);
-        if (!$isRunMethod){
+        var_dump($lokalniPromenne);
+        if (!$isRunMethod) {
             // chybi metoda run
             throw new InterpreterError(ErrorCode::SEM_MAIN);
         }
     }
     // funkce zjisti jestli se jedna o literal, zaslani zpravy a podle toho pracuje
-    public function parseExpression(Expr $expr) : object
+    public function parseExpression(Expr $expr, array $methods, array $lokalniPromenne): object
     {
-        if ($expr->literal != null)
-        {   // kdyz vyrazem je literal
-            return $this->assignTo($expr->literal);
-        }else if ($expr->block != null)
-        {   // kdyz vyrazem bude block
-            return $this->assignTo($expr->block);
-        }else if ($expr->send != null)
-        {
+        if ($expr->literal != null) {   // kdyz vyrazem je literal
+            return $this->assignTo($expr->literal, $lokalniPromenne);
+        } elseif ($expr->block != null) {   // kdyz vyrazem bude block
+            return $this->assignTo($expr->block, $lokalniPromenne);
+        } elseif ($expr->send != null) {
             // receiver je nejaky vyraz
-            return $this->sendMsg($expr->send->receiver, $expr->send->selector, $expr->send->args);
-        }else if ($expr->variable != null)
-        {
-            return $this->assignTo($expr->variable);
+            return $this->sendMsg($expr->send->receiver, $expr->send->selector, $expr->send->args, $methods, $lokalniPromenne);
+        } elseif ($expr->variable != null) {
+            // vraci Variable pokud je to self
+            $returnObject = $this->assignTo($expr->variable, $lokalniPromenne);
+            return $returnObject;
         }
         return new ObjectEntity();
     }
     // funkce vraci vytvoreny objekt
-    public function assignTo(object $object) : object
+    public function assignTo(object $object, array $lokalniPromenne): object
     {
-        if ($object instanceof Literal)
-        {
-            if ($object->classId == "Integer")
-            {
+        if ($object instanceof Literal) {
+            if ($object->classId == "Integer") {
                 return new IntegerEntity((int)$object->value);
             }
-            if ($object->classId == "String")
-            {
+            if ($object->classId == "String") {
                 return new StringEntity($object->value);
             }
-            if ($object->classId == "True")
-            {
+            if ($object->classId == "True") {
                 return TrueEntity::getInstance();
             }
-            if ($object->classId == "False")
-            {
+            if ($object->classId == "False") {
                 return FalseEntity::getInstance();
             }
             if ($object->classId == "Nil") {
@@ -217,38 +208,77 @@ class Interpreter
             }
         }
         // pokud se jedna o prirazeni promenne, je nejprve tato promenna vyhledana, jestli vubec existuje
-        if ($object instanceof Variable)
-        {
-            if (array_key_exists($object->name, $this->promenne))
-            {
-                return $this->promenne[$object->name];
-            }else
-            {
+        if ($object instanceof Variable) {
+            if ($object->name == "self") {
+                return $object;
+            }
+            if (array_key_exists($object->name, $lokalniPromenne)) {
+                return $lokalniPromenne[$object->name];
+            } else {
                 // chyba, pouziti nedefinovane promenne
                 throw new InterpreterError(ErrorCode::SEM_UNDEF);
             }
         }
-        return new $object;
+        return new $object();
     }
+
+
+    /**
+     *
+     * @param array<Arg> $args - volitelne mnozstvi argumentuu
+     * */
+//    public function parseMethod(array $methods, string $selector, array $args) : object {
+//        $lokalniMetodaPromenne = [];
+//        foreach ($args as $arg) {
+//            $lokalniMetodaPromenne[$arg->]
+//        }
+//        foreach ($methods as $method) {
+//            if ($method->selector == $selector) {
+//                foreach ($method->block->assigns as $assign) {
+//                    if ($assign->target->name == "_") {
+//                        return $this->parseExpression($assign->expr, $methods, $lokalniMetodaPromenne);
+//                    } else {
+//                        $lokalniMetodaPromenne[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $lokalniMetodaPromenne);
+//                    }
+//                }
+//            }
+//        }
+//    }
+
 
     /**
      * @param Expr $receiver - vyraz, ktery se vyhodnoti na objekt, tento objekt je prijemcem zpravy
      * @param string $selector - metoda, co budu hledat
      * @param array<Arg> $args - volitelne mnozstvi argumentuu
+     * @param array<Method> $methods
      */
-    public function sendMsg(Expr $receiver,string $selector,array $args): object {
+    public function sendMsg(Expr $receiver, string $selector, array $args, array $methods, array $lokalniPromenne): object
+    {
         // parseAssign pro receiver
         $argument = null;
-        $object = $this->parseExpression($receiver);
+        $object = $this->parseExpression($receiver, $methods, $lokalniPromenne);
         if ($args != null) {
-            $argument = $this->parseExpression($args[0]->expr);
+            $argument = $this->parseExpression($args[0]->expr, $methods, $lokalniPromenne);
         }
+
+        // TBD tomorrow
+//        if ($object instanceof Variable) {
+//            if ($object->name == "self") {
+//                foreach ($methods as $method) {
+//                    if ($method->selector == $selector) {
+//                        return $this->parseMethod($methods, $selector, $args);
+//                    }
+//                }
+//            }
+//        }
+
+
         // metody, ktere jsou pro vsechny objekty spolecne
         switch ($selector) {
             case "identicalTo:":
-                return $object->identicalTo($object, $argument);
-//            case "equalTo:":
-//                return $object->equalTo()
+                return $object->identicalTo($argument);
+            case "equalTo:":
+                return $object->equalTo($argument);
             case "asString":
                 return $object->asString();
             case "isNumber":
@@ -268,51 +298,53 @@ class Interpreter
         }
 
         // Metody, ktere muze provadet String Entity
-        if ($object instanceof StringEntity){
-            switch ($selector){
+        if ($object instanceof StringEntity) {
+            switch ($selector) {
                 case "print":
                     return $object->print();
                 case "asInteger":
                     return $object->asInteger();
+                case "concatenateWith:":
+                    return $object->concatenateWith($argument);
+                case "length":
+                    return $object->length();
             }
         }
         // metody, ktere muze provadet IntegerEntity
-        if ($object instanceof IntegerEntity){
+        if ($object instanceof IntegerEntity) {
             switch ($selector) {
                 case "asInteger":
                     return $object->asInteger();
                 case "greaterThan:":
-                    if ($argument instanceof IntegerEntity){
+                    if ($argument instanceof IntegerEntity) {
                         return $object->greaterThan($argument);
                     }
                     throw new InterpreterError(ErrorCode::INT_OTHER);
                 case "plus:":
-                    if ($argument instanceof IntegerEntity){
+                    if ($argument instanceof IntegerEntity) {
                         return $object->plus($argument);
                     }
                     throw new InterpreterError(ErrorCode::INT_OTHER);
                 case "minus:":
-                    if ($argument instanceof IntegerEntity){
+                    if ($argument instanceof IntegerEntity) {
                         return $object->minus($argument);
                     }
                     throw new InterpreterError(ErrorCode::INT_OTHER);
                 case "multiplyBy:":
-                    if ($argument instanceof IntegerEntity){
+                    if ($argument instanceof IntegerEntity) {
                         return $object->multiplyBy($argument);
                     }
                     throw new InterpreterError(ErrorCode::INT_OTHER);
                 case "divBy:":
-                    if ($argument instanceof IntegerEntity){
+                    if ($argument instanceof IntegerEntity) {
                         return $object->divBy($argument);
                     }
                     throw new InterpreterError(ErrorCode::INT_OTHER);
 
 //                case "timesRepeat:":
-
             }
         }
 
         return $object;
     }
-
 }
