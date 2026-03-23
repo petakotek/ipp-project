@@ -18,16 +18,15 @@ namespace IPP\Interpreter;
 
 use DOMDocument;
 use DOMElement;
-use IPP\Interpreter\Classes\ClassEntity;
+use IPP\Interpreter\Classes\ObjectEntity;
 use IPP\Interpreter\Classes\Common\FalseEntity;
 use IPP\Interpreter\Classes\Common\IntegerEntity;
 use IPP\Interpreter\Classes\Common\NilEntity;
 use IPP\Interpreter\Classes\Common\StringEntity;
 use IPP\Interpreter\Classes\Common\TrueEntity;
-use IPP\Interpreter\Classes\MethodEntity;
-use IPP\Interpreter\Classes\ObjectEntity;
 use IPP\Interpreter\Exception\ErrorCode;
 use IPP\Interpreter\Exception\InterpreterError;
+use IPP\Interpreter\InputModel\Arg;
 use IPP\Interpreter\InputModel\ClassDef;
 use IPP\Interpreter\InputModel\Expr;
 use IPP\Interpreter\InputModel\Literal;
@@ -153,6 +152,7 @@ class Interpreter
                 }
             }
         }
+        var_dump($this->promenne);
         if (!$isRunMethod){
             // chybi metoda run
             throw new InterpreterError(ErrorCode::SEM_MAIN);
@@ -170,7 +170,7 @@ class Interpreter
         }else if ($expr->send != null)
         {
             // receiver je nejaky vyraz
-            return $this->sendMsg($expr->send->receiver, $expr->send->selector);
+            return $this->sendMsg($expr->send->receiver, $expr->send->selector, $expr->send->args);
         }else if ($expr->variable != null)
         {
             return $this->assignTo($expr->variable);
@@ -192,17 +192,31 @@ class Interpreter
             }
             if ($object->classId == "True")
             {
-                return new TrueEntity();
+                return TrueEntity::getInstance();
             }
             if ($object->classId == "False")
             {
-                return new FalseEntity();
+                return FalseEntity::getInstance();
             }
             if ($object->classId == "Nil") {
                 return new NilEntity();
             }
-
+            if ($object->classId == "class") {
+                switch ($object->value) {
+                    case "Integer":
+                        return new IntegerEntity();
+                    case "String":
+                        return new StringEntity();
+                    case "Nil":
+                        return new NilEntity();
+                    case "True":
+                        return TrueEntity::getInstance();
+                    case "False":
+                        return FalseEntity::getInstance();
+                }
+            }
         }
+        // pokud se jedna o prirazeni promenne, je nejprve tato promenna vyhledana, jestli vubec existuje
         if ($object instanceof Variable)
         {
             if (array_key_exists($object->name, $this->promenne))
@@ -214,37 +228,90 @@ class Interpreter
                 throw new InterpreterError(ErrorCode::SEM_UNDEF);
             }
         }
-        return new ObjectEntity();
+        return new $object;
     }
 
-    ///
-    /// $receiver - vyraz, ktery se vyhodnoti na objekt, tento objekt je prijemcem zpravy
-    /// $selector - metoda, co budu hledat
-    /// ...$args - volitelne mnozstvi argumentuu
-    public function sendMsg(Expr $receiver,string $selector, ...$args): object {
+    /**
+     * @param Expr $receiver - vyraz, ktery se vyhodnoti na objekt, tento objekt je prijemcem zpravy
+     * @param string $selector - metoda, co budu hledat
+     * @param array<Arg> $args - volitelne mnozstvi argumentuu
+     */
+    public function sendMsg(Expr $receiver,string $selector,array $args): object {
         // parseAssign pro receiver
+        $argument = null;
         $object = $this->parseExpression($receiver);
+        if ($args != null) {
+            $argument = $this->parseExpression($args[0]->expr);
+        }
+        // metody, ktere jsou pro vsechny objekty spolecne
+        switch ($selector) {
+            case "identicalTo:":
+                return $object->identicalTo($object, $argument);
+//            case "equalTo:":
+//                return $object->equalTo()
+            case "asString":
+                return $object->asString();
+            case "isNumber":
+                return $object->isNumber();
+            case "isString":
+                return $object->isString();
+            case "isBlock":
+                return $object->isBlock();
+            case "isNil":
+                return $object->isNil();
+            case "isBoolean":
+                return $object->isBoolean();
+            case "new":
+                return $object::new();
+            case "from:":
+                return $object::from($argument->value);
+        }
+
+        // Metody, ktere muze provadet String Entity
         if ($object instanceof StringEntity){
             switch ($selector){
-                case "asString":
-                    return $object->asString();
                 case "print":
                     return $object->print();
-            }
-        }
-        if ($object instanceof IntegerEntity){
-            switch ($selector) {
-                case "asString":
-                    return $object->asString();
                 case "asInteger":
                     return $object->asInteger();
             }
         }
-        if ($object instanceof NilEntity){
-            if ($selector == "asString") {
-                return $object->asString();
+        // metody, ktere muze provadet IntegerEntity
+        if ($object instanceof IntegerEntity){
+            switch ($selector) {
+                case "asInteger":
+                    return $object->asInteger();
+                case "greaterThan:":
+                    if ($argument instanceof IntegerEntity){
+                        return $object->greaterThan($argument);
+                    }
+                    throw new InterpreterError(ErrorCode::INT_OTHER);
+                case "plus:":
+                    if ($argument instanceof IntegerEntity){
+                        return $object->plus($argument);
+                    }
+                    throw new InterpreterError(ErrorCode::INT_OTHER);
+                case "minus:":
+                    if ($argument instanceof IntegerEntity){
+                        return $object->minus($argument);
+                    }
+                    throw new InterpreterError(ErrorCode::INT_OTHER);
+                case "multiplyBy:":
+                    if ($argument instanceof IntegerEntity){
+                        return $object->multiplyBy($argument);
+                    }
+                    throw new InterpreterError(ErrorCode::INT_OTHER);
+                case "divBy:":
+                    if ($argument instanceof IntegerEntity){
+                        return $object->divBy($argument);
+                    }
+                    throw new InterpreterError(ErrorCode::INT_OTHER);
+
+//                case "timesRepeat:":
+
             }
         }
+
         return $object;
     }
 

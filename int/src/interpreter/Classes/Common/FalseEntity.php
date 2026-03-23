@@ -4,23 +4,37 @@ namespace IPP\Interpreter\Classes\Common;
 
 use IPP\Interpreter\Classes\ObjectEntity;
 
-class FalseEntity extends ObjectEntity
+final class FalseEntity extends ObjectEntity
 {
+    /** @var array<FalseEntity> */
+    private static array $instances = [];
     public bool $value = false;
 
-    public function asString() : StringEntity {
-        return new StringEntity((string)$this->value);
+    protected function __construct(){
+        parent::__construct();
     }
-    public function not(TrueEntity $cilovyObjekt) : bool{
+
+    protected function __clone()
+    {
+    }
+    public static function getInstance(): FalseEntity
+    {
+        $cls = FalseEntity::class;
+        if (!isset(self::$instances[$cls])) {
+            self::$instances[$cls] = new FalseEntity();
+        }
+
+        return self::$instances[$cls];
+    }
+    public function asString() : StringEntity {
+        return new StringEntity('false');
+    }
+    public function not(FalseEntity $cilovyObjekt) : bool{
         return !$cilovyObjekt->value;
     }
 
+
 //    public function and(TrueEntity $cilovyObjekt) : bool{
-//        if($cilovyObjekt->value == false){
-//            return false;
-//        }else{
-//
-//        }
 //    }
 
 //    public function or(IntegerEntity $cilovyObjekt){}
@@ -29,5 +43,11 @@ class FalseEntity extends ObjectEntity
 
     public function isBoolean() : bool{
         return true;
+    }
+
+    /// KONSTRUKTORY
+    public static function new(): static
+    {
+        return new self();
     }
 }

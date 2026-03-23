@@ -5,10 +5,11 @@ namespace IPP\Interpreter\Classes\Common;
 use IPP\Interpreter\Classes\Common\NilEntity;
 use IPP\Interpreter\Classes\ObjectEntity;
 
-class StringEntity extends ObjectEntity
+final class StringEntity extends ObjectEntity implements Instantiable
 {
     public string $value = '';
-    public function __construct(string $value){
+    public function __construct(string $value = ''){
+        parent::__construct();
         $this->value = $value;
     }
     // TBD
@@ -48,4 +49,13 @@ class StringEntity extends ObjectEntity
     public function length() : IntegerEntity{
         return new IntegerEntity(strlen($this->value));
     }
+
+    public static function new(): static
+    {
+        return new self('');
+    }
+    public static function from(mixed $parameter) : static{
+        return new self($parameter);
+    }
+
 }

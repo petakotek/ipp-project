@@ -3,20 +3,29 @@
 namespace IPP\Interpreter\Classes\Common;
 
 use IPP\Interpreter\Classes\ObjectEntity;
+use IPP\Interpreter\Exception\ErrorCode;
+use IPP\Interpreter\Exception\InterpreterError;
 
-class IntegerEntity extends ObjectEntity
+final class IntegerEntity extends ObjectEntity implements Instantiable
 {
     public int $value = 0;
     // konstruktor nastaveni hodnoty $value
-    public function __construct(int $value){
+    public function __construct(int $value = 0){
+        parent::__construct();
         $this->value = $value;
     }
     /// Funkce porovna, ze je ciselna hodnota prijemce a argumentu shodna
-    public function equalTo(IntegerEntity $cilovyObjekt) : bool{
-        return $this->value == $cilovyObjekt->value;
+    public function equalTo(IntegerEntity $cilovyObjekt) : TrueEntity | FalseEntity{
+        if ($this->value == $cilovyObjekt->value){
+            return TrueEntity::getInstance();
+        }
+        return FalseEntity::getInstance();
     }
-    public function greaterThan(IntegerEntity $cilovyObjekt) : bool{
-        return $this->value > $cilovyObjekt->value;
+    public function greaterThan(IntegerEntity $cilovyObjekt) : TrueEntity | FalseEntity{
+        if ($this->value > $cilovyObjekt->value){
+            return TrueEntity::getInstance();
+        }
+        return FalseEntity::getInstance();
     }
     public function plus(IntegerEntity $cilovyObjekt) : IntegerEntity{
         return new IntegerEntity($this->value + $cilovyObjekt->value);
@@ -28,6 +37,10 @@ class IntegerEntity extends ObjectEntity
         return new IntegerEntity($this->value * $cilovyObjekt->value);
     }
     public function divBy(IntegerEntity $cilovyObjekt) : IntegerEntity{
+        if ($cilovyObjekt->value == 0){
+            // deleni nulou vede na chybu 53
+            throw new InterpreterError(ErrorCode::INT_INVALID_ARG);
+        }
         return new IntegerEntity($this->value / $cilovyObjekt->value);
     }
     ///
@@ -39,11 +52,16 @@ class IntegerEntity extends ObjectEntity
         return $this;
     }
 
-
     // TBD
 //    public function timesRepeat(){
 //
 //    }
 
-
+    public static function new(): static
+    {
+        return new self(0);
+    }
+    public static function from(mixed $parameter) : static{
+        return new self($parameter);
+    }
 }

@@ -6,42 +6,35 @@
         <assign order="1">
           <var name="x"/>
           <expr>
-            <literal class="Nil" value="nil"/>
-          </expr>
-        </assign>
-        <assign order="2">
-          <var name="y"/>
-          <expr>
-            <literal class="True" value="true"/>
-          </expr>
-        </assign>
-        <assign order="3">
-          <var name="z"/>
-          <expr>
-            <literal class="String" value="ahoj"/>
-          </expr>
-        </assign>
-        <assign order="4">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
+            <send selector="new">
               <expr>
-                <send selector="asString">
-                  <expr>
-                    <var name="x"/>
-                  </expr>
-                </send>
+                <literal class="class" value="True"/>
               </expr>
             </send>
           </expr>
         </assign>
-        <assign order="5">
-          <var name="q"/>
+        <assign order="2">
+          <var name="yy"/>
           <expr>
-            <send selector="print">
+            <send selector="new">
               <expr>
-                <literal class="String" value="tisk"/>
+                <literal class="class" value="True"/>
               </expr>
+            </send>
+          </expr>
+        </assign>
+        <assign order="3">
+          <var name="y"/>
+          <expr>
+            <send selector="from:">
+              <expr>
+                <literal class="class" value="Integer"/>
+              </expr>
+              <arg order="1">
+                <expr>
+                  <literal class="Integer" value="5"/>
+                </expr>
+              </arg>
             </send>
           </expr>
         </assign>

@@ -2,15 +2,18 @@
 
 namespace IPP\Interpreter\Classes;
 
+use IPP\Interpreter\Classes\Common\FalseEntity;
 use IPP\Interpreter\Classes\Common\StringEntity;
+use IPP\Interpreter\Classes\Common\TrueEntity;
 
 class ObjectEntity
 {
-    public function identicalTo(object $myself, object $target) : bool{
+    public function __construct() {}
+    public function identicalTo(object $myself, object $target) : TrueEntity | FalseEntity{
         if($myself instanceof $target) {
-            return true;
+            return new TrueEntity();
         }
-        return false;
+        return new FalseEntity();
     }
 //    public function equalTo(object $myself, object $target) : bool{
 //        if
