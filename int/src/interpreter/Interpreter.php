@@ -31,6 +31,7 @@ use IPP\Interpreter\InputModel\ClassDef;
 use IPP\Interpreter\InputModel\Expr;
 use IPP\Interpreter\InputModel\Literal;
 use IPP\Interpreter\InputModel\Method;
+use IPP\Interpreter\InputModel\Parameter;
 use IPP\Interpreter\InputModel\Program;
 use IPP\Interpreter\InputModel\Variable;
 use IPP\Interpreter\InputModel\XmlValidationException;
@@ -97,35 +98,40 @@ class Interpreter
         if ($this->currentProgram === null) {
             throw new InterpreterError(ErrorCode::INT_OTHER, 'No program is loaded.');
         }
-        $this->parseClasses($this->currentProgram->classes);
-        // testy kvality :
-        // xkotekp00@LAPTOP-T421UQ1R:~/rocnik2/ipp/project/int$ vendor/bin/phpstan analyse src/
-    }
 
-    /**
-     * Zpracuje kazdou tridu, zatim pouze jen Main tridu
-     * @param array<ClassDef> $classes
-     */
-    public function parseClasses(array $classes): void
-    {
         $isMainClass = false;
-
+        $parentClassExists = false;
         // procházení všech tříd a nalezení třídy Main pro start programu
-        foreach ($classes as $class) {
+        foreach ($this->currentProgram->classes as $class) {
             if ($class->name == "Main" && $class->parent != "") {
-                $isMainClass = true;
-                $this->parseRunMethod($class->methods);
+                $parentClass = $class->parent;
+                // pokud je to Object, tak urcite existuje
+                if ($class->parent == "Object") {
+                    $parentClassExists = true;
+                // jinak vyhledam v poli trid
+                } elseif (array_key_exists($parentClass, $this->currentProgram->classes)) {
+                    $parentClassExists = true;
+                }
+                if (!$parentClassExists) {
+                    throw new InterpreterError(ErrorCode::SEM_UNDEF);
+                }
+                if ($parentClass != $class->name) {
+                    $isMainClass = true;
+                    $this->parseRunMethod($class->methods);
+                } else {
+                    throw new InterpreterError(ErrorCode::SEM_ERROR);
+                }
             }
         }
 
         if (!$isMainClass) {
-            // chybi trida Main
+            // chybi trida Main | chyba 31
             throw new InterpreterError(ErrorCode::SEM_MAIN);
         }
+
+        // testy kvality :
+        // xkotekp00@LAPTOP-T421UQ1R:~/rocnik2/ipp/project/int$ vendor/bin/phpstan analyse src/
     }
-
-
-
 
     /**
      * Funkce na zpracování metody Run, odtud startuje hlavní chování programu
@@ -145,19 +151,20 @@ class Interpreter
                     if ($assign->target->name == "_") {
                         $this->parseExpression($assign->expr, $methods, $lokalniPromenne);
                     } else {
-                        $lokalniPromenne[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $lokalniPromenne);
+                        $target = $assign->target->name;
+                        $lokalniPromenne[$target] = $this->parseExpression($assign->expr, $methods, $lokalniPromenne);
                     }
                 }
             }
         }
-        var_dump($lokalniPromenne);
+//        var_dump($lokalniPromenne);
         if (!$isRunMethod) {
             // chybi metoda run
             throw new InterpreterError(ErrorCode::SEM_MAIN);
         }
     }
     // funkce zjisti jestli se jedna o literal, zaslani zpravy a podle toho pracuje
-    public function parseExpression(Expr $expr, array $methods, array $lokalniPromenne): object
+    public function parseExpression(Expr $expr, array $methods, array &$lokalniPromenne): object
     {
         if ($expr->literal != null) {   // kdyz vyrazem je literal
             return $this->assignTo($expr->literal, $lokalniPromenne);
@@ -165,7 +172,10 @@ class Interpreter
             return $this->assignTo($expr->block, $lokalniPromenne);
         } elseif ($expr->send != null) {
             // receiver je nejaky vyraz
-            return $this->sendMsg($expr->send->receiver, $expr->send->selector, $expr->send->args, $methods, $lokalniPromenne);
+            $receiver = $expr->send->receiver;
+            $selector = $expr->send->selector;
+            $arguments = $expr->send->args;
+            return $this->sendMsg($receiver, $selector, $arguments, $methods, $lokalniPromenne);
         } elseif ($expr->variable != null) {
             // vraci Variable pokud je to self
             $returnObject = $this->assignTo($expr->variable, $lokalniPromenne);
@@ -209,7 +219,7 @@ class Interpreter
         }
         // pokud se jedna o prirazeni promenne, je nejprve tato promenna vyhledana, jestli vubec existuje
         if ($object instanceof Variable) {
-            if ($object->name == "self") {
+            if ($object->name == "self" || $object->name == "super") {
                 return $object;
             }
             if (array_key_exists($object->name, $lokalniPromenne)) {
@@ -224,53 +234,76 @@ class Interpreter
 
 
     /**
-     *
+     * @param array<Method> $methods
      * @param array<Arg> $args - volitelne mnozstvi argumentuu
      * */
-//    public function parseMethod(array $methods, string $selector, array $args) : object {
-//        $lokalniMetodaPromenne = [];
-//        foreach ($args as $arg) {
-//            $lokalniMetodaPromenne[$arg->]
-//        }
-//        foreach ($methods as $method) {
-//            if ($method->selector == $selector) {
-//                foreach ($method->block->assigns as $assign) {
-//                    if ($assign->target->name == "_") {
-//                        return $this->parseExpression($assign->expr, $methods, $lokalniMetodaPromenne);
-//                    } else {
-//                        $lokalniMetodaPromenne[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $lokalniMetodaPromenne);
-//                    }
-//                }
-//            }
-//        }
-//    }
+    public function parseMethod(array $methods, string $selector, array $arguments): object
+    {
+        $lokalniMetodaPromenne = [];
+        $lastAssign = null;
+        foreach ($methods as $method) {
+            if ($method->selector == $selector) {
+                $lokalniMetodaPromenne = $this->fillParameters($method->block->parameters, $arguments);
+                foreach ($method->block->assigns as $assign) {
 
+                    $lokalniMetodaPromenne[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $lokalniMetodaPromenne);
+                    $lastAssign = $assign->target->name;
 
+                }
+                return $lokalniMetodaPromenne[$lastAssign];
+            }
+        }
+
+        return new ObjectEntity();
+    }
+
+    /**
+     * @param array<Parameter> $parameters
+     * @param array<IntegerEntity,StringEntity,TrueEntity> $arguments
+     * @return array
+     */
+    public function fillParameters(array $parameters, array $arguments): array {
+        $locals = [];
+        if (count($parameters) != count($arguments)) {
+            throw new InterpreterError(ErrorCode::SEM_ARITY);
+        }
+        foreach ($parameters as $parameter) {
+            $locals[$parameter->name] = $arguments[$parameter->order];
+        }
+        return $locals;
+    }
     /**
      * @param Expr $receiver - vyraz, ktery se vyhodnoti na objekt, tento objekt je prijemcem zpravy
      * @param string $selector - metoda, co budu hledat
      * @param array<Arg> $args - volitelne mnozstvi argumentuu
      * @param array<Method> $methods
+     * @param $locals - lokalni promenne v danem bloku metody
      */
-    public function sendMsg(Expr $receiver, string $selector, array $args, array $methods, array $lokalniPromenne): object
+    public function sendMsg(Expr $receiver, string $selector, array $args, array $methods, array &$locals): object
     {
         // parseAssign pro receiver
+        $arguments = [];
         $argument = null;
-        $object = $this->parseExpression($receiver, $methods, $lokalniPromenne);
+        $object = $this->parseExpression($receiver, $methods, $locals);
         if ($args != null) {
-            $argument = $this->parseExpression($args[0]->expr, $methods, $lokalniPromenne);
+            foreach ($args as $arg) {
+                $arguments[$arg->order] = $this->parseExpression($arg->expr, $methods, $locals);
+            }
+//            var_dump($arguments);
+            $argument = $arguments[1];
         }
 
-        // TBD tomorrow
-//        if ($object instanceof Variable) {
-//            if ($object->name == "self") {
-//                foreach ($methods as $method) {
-//                    if ($method->selector == $selector) {
-//                        return $this->parseMethod($methods, $selector, $args);
-//                    }
-//                }
-//            }
-//        }
+        // Pokud se jedna o self metodu metodu
+        if ($object instanceof Variable) {
+            if ($object->name == "self") {
+                foreach ($methods as $method) {
+                    if ($method->selector == $selector) {
+                        // ARGUMENT JE TED JENOM JEDEN INT, POZOR, UDELAT NEJAKOU FUNKCI NA VYTVORENI POLE TECH ARGUMENTUUU
+                        return $this->parseMethod($methods, $selector, $arguments);
+                    }
+                }
+            }
+        }
 
 
         // metody, ktere jsou pro vsechny objekty spolecne
