@@ -1,7 +1,9 @@
 class Main : Object {
   run
     [ |
-      b := [ :idx | _ := (idx asString) print. ].
-      x := 5 timesRepeat: b.
+      x := 0.
+      b := [ | x := 1.  y := 2. ].
+      _ := ((b value) asString) print.
+      _ := (x asString) print.
     ]
 }

@@ -196,7 +196,7 @@ class Interpreter
      * @param object $object
      * @param array<string,mixed> $lokalniPromenne
      */
-    public function assignTo(object $object, array $lokalniPromenne): object
+    public function assignTo(object $object, array &$lokalniPromenne): object
     {
         if ($object instanceof Literal) {
             if ($object->classId == "Integer") {
@@ -242,7 +242,7 @@ class Interpreter
             }
         }
         if ($object instanceof Block) {
-            return new BlockEntity($object);
+            return new BlockEntity($object, $lokalniPromenne);
         }
         return new $object();
     }
@@ -286,6 +286,9 @@ class Interpreter
 
         foreach ($block->assigns as $assign) {
                 $locals[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $locals);
+                if (isset($block->upperLocals[$assign->target->name])) {
+                    $block->upperLocals[$assign->target->name] = $locals[$assign->target->name];
+                }
                 $lastAssign = $assign->target->name;
         }
         return $locals[$lastAssign];
