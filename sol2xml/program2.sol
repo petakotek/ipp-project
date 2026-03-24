@@ -9,9 +9,9 @@ class Main : Object {
       a := b1 value: 3 value: 5.
       _ := (a asString) print.
       _ := ' ' print.
-      xx := self foo: ('x' asInteger) f: 4.
-      _ := ' ' print.
-      _ := (xx asString) print.
+      xx := self foo: ('5' asInteger) f: 4.
+
+
     ]
   foo:f: [:x :y |
      _ := 'Dusan says: ' print.

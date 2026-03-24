@@ -331,6 +331,7 @@ class Interpreter
                         return $this->parseMethod($methods, $selector, $arguments);
                     }
                 }
+                throw new InterpreterError(ErrorCode::SEM_UNDEF);
             }
         }
 
