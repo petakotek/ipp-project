@@ -18,6 +18,7 @@ namespace IPP\Interpreter;
 
 use DOMDocument;
 use DOMElement;
+use IPP\Interpreter\Classes\BlockEntity;
 use IPP\Interpreter\Classes\ObjectEntity;
 use IPP\Interpreter\Classes\Common\FalseEntity;
 use IPP\Interpreter\Classes\Common\IntegerEntity;
@@ -27,6 +28,7 @@ use IPP\Interpreter\Classes\Common\TrueEntity;
 use IPP\Interpreter\Exception\ErrorCode;
 use IPP\Interpreter\Exception\InterpreterError;
 use IPP\Interpreter\InputModel\Arg;
+use IPP\Interpreter\InputModel\Block;
 use IPP\Interpreter\InputModel\ClassDef;
 use IPP\Interpreter\InputModel\Expr;
 use IPP\Interpreter\InputModel\Literal;
@@ -139,7 +141,6 @@ class Interpreter
      */
     public function parseRunMethod(array $methods): void
     {
-        /** @var array<string, object> $promenneMain */
         $lokalniPromenne = [];
 
         $isRunMethod = false;
@@ -164,6 +165,12 @@ class Interpreter
         }
     }
     // funkce zjisti jestli se jedna o literal, zaslani zpravy a podle toho pracuje
+
+    /**
+     * @param Expr $expr
+     * @param array<Method> $methods
+     * @param array<mixed> $lokalniPromenne
+     */
     public function parseExpression(Expr $expr, array $methods, array &$lokalniPromenne): object
     {
         if ($expr->literal != null) {   // kdyz vyrazem je literal
@@ -184,6 +191,11 @@ class Interpreter
         return new ObjectEntity();
     }
     // funkce vraci vytvoreny objekt
+
+    /***
+     * @param object $object
+     * @param array<string,mixed> $lokalniPromenne
+     */
     public function assignTo(object $object, array $lokalniPromenne): object
     {
         if ($object instanceof Literal) {
@@ -229,43 +241,60 @@ class Interpreter
                 throw new InterpreterError(ErrorCode::SEM_UNDEF);
             }
         }
+        if ($object instanceof Block) {
+            return new BlockEntity($object);
+        }
         return new $object();
     }
 
 
     /**
      * @param array<Method> $methods
-     * @param array<Arg> $args - volitelne mnozstvi argumentuu
+     * @param array<int, mixed> $arguments - volitelne mnozstvi argumentuu
      * */
     public function parseMethod(array $methods, string $selector, array $arguments): object
     {
-        $lokalniMetodaPromenne = [];
+        $locals = [];
         $lastAssign = null;
         foreach ($methods as $method) {
             if ($method->selector == $selector) {
-                $lokalniMetodaPromenne = $this->fillParameters($method->block->parameters, $arguments);
+                $locals = $this->fillParameters($method->block->parameters, $arguments);
                 foreach ($method->block->assigns as $assign) {
-
-                    $lokalniMetodaPromenne[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $lokalniMetodaPromenne);
+                    $locals[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $locals);
                     $lastAssign = $assign->target->name;
-
                 }
-                return $lokalniMetodaPromenne[$lastAssign];
+                return $locals[$lastAssign];
             }
         }
 
         return new ObjectEntity();
     }
+    /**
+     * @param array<int, mixed> $arguments - volitelne mnozstvi argumentuu
+     * */
+    public function parseBlock(BlockEntity $block, array $arguments, array $methods): object
+    {
+        $locals = [];
+        $lastAssign = null;
+
+        $locals = $this->fillParameters($block->locals, $arguments);
+        foreach ($block->assigns as $assign) {
+                $locals[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $locals);
+                $lastAssign = $assign->target->name;
+        }
+        return $locals[$lastAssign];
+    }
 
     /**
      * @param array<Parameter> $parameters
-     * @param array<IntegerEntity,StringEntity,TrueEntity> $arguments
-     * @return array
+     * @param array<int, mixed> $arguments
+     * @return array<string, mixed>
      */
-    public function fillParameters(array $parameters, array $arguments): array {
+    public function fillParameters(array $parameters, array $arguments): array
+    {
         $locals = [];
         if (count($parameters) != count($arguments)) {
-            throw new InterpreterError(ErrorCode::SEM_ARITY);
+            throw new InterpreterError(ErrorCode::INT_INST_ATTR);
         }
         foreach ($parameters as $parameter) {
             $locals[$parameter->name] = $arguments[$parameter->order];
@@ -277,7 +306,7 @@ class Interpreter
      * @param string $selector - metoda, co budu hledat
      * @param array<Arg> $args - volitelne mnozstvi argumentuu
      * @param array<Method> $methods
-     * @param $locals - lokalni promenne v danem bloku metody
+     * @param array<mixed>$locals - lokalni promenne v danem bloku metody
      */
     public function sendMsg(Expr $receiver, string $selector, array $args, array $methods, array &$locals): object
     {
@@ -298,7 +327,7 @@ class Interpreter
             if ($object->name == "self") {
                 foreach ($methods as $method) {
                     if ($method->selector == $selector) {
-                        // ARGUMENT JE TED JENOM JEDEN INT, POZOR, UDELAT NEJAKOU FUNKCI NA VYTVORENI POLE TECH ARGUMENTUUU
+                        // provede danou metodu celou
                         return $this->parseMethod($methods, $selector, $arguments);
                     }
                 }
@@ -338,7 +367,11 @@ class Interpreter
                 case "asInteger":
                     return $object->asInteger();
                 case "concatenateWith:":
-                    return $object->concatenateWith($argument);
+                    if ($argument != null) {
+                        return $object->concatenateWith($argument);
+                    }
+                    break;
+
                 case "length":
                     return $object->length();
             }
@@ -375,6 +408,15 @@ class Interpreter
                     throw new InterpreterError(ErrorCode::INT_OTHER);
 
 //                case "timesRepeat:":
+            }
+        }
+
+        if ($object instanceof BlockEntity) {
+            switch ($selector) {
+                case "value":
+                    break;
+                case str_repeat("value:", count($arguments)):
+                    return $this->parseBlock($object, $arguments, $methods);
             }
         }
 

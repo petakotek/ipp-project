@@ -31,9 +31,9 @@ final class FalseEntity extends ObjectEntity
     {
         return new StringEntity('false');
     }
-    public function not(FalseEntity $cilovyObjekt): bool
+    public function not(): TrueEntity
     {
-        return !$cilovyObjekt->value;
+        return TrueEntity::getInstance();
     }
 
 

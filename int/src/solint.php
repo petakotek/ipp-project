@@ -52,7 +52,6 @@ $command->option(
     'Path to a file used as standard input for the interpreted program.'
 );
 $command->option(
-
     '-v, --verbose',
     'Enable verbose logging output (using once = INFO, using twice = DEBUG).',
     null,
