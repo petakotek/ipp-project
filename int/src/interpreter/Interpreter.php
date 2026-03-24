@@ -270,6 +270,9 @@ class Interpreter
         return new ObjectEntity();
     }
     /**
+     * Funkce provede všechny příkazy v Bloku, pokud jsou parametry, tak si
+     * parametry uloží do pole a  následně s nimi pokud jsou použity pracuje
+     *
      * @param array<int, mixed> $arguments - volitelne mnozstvi argumentuu
      * @param array<Method> $methods
      * */
@@ -375,6 +378,11 @@ class Interpreter
                         return $object->concatenateWith($argument);
                     }
                     break;
+                case "startsWith:endsBefore:":
+                    if ($arguments[1] instanceof IntegerEntity && $arguments[2] instanceof IntegerEntity) {
+                        return $object->startsWidthEndsBefore($arguments[1]->value, $arguments[2]->value);
+                    }
+                    throw new InterpreterError(ErrorCode::INT_INVALID_ARG);
 
                 case "length":
                     return $object->length();
@@ -411,7 +419,14 @@ class Interpreter
                     }
                     throw new InterpreterError(ErrorCode::INT_OTHER);
 
-//                case "timesRepeat:":
+                case "timesRepeat:":
+                    if ($argument instanceof BlockEntity) {
+                        for ($i = 1; $i <= $object->value; $i++) {
+                            $arr[1] = $object->timesRepeat($i);
+                            $returnObject = $this->parseBlock($argument, $arr, $methods, setParams: true);
+                        }
+                    }
+                    return $returnObject;
             }
         }
 
@@ -424,6 +439,33 @@ class Interpreter
             }
         }
 
-        return $object;
+        if ($object instanceof TrueEntity || $object instanceof FalseEntity) {
+            switch ($selector) {
+
+                case "not":
+                    return $object->not();
+
+                case "and:":
+                    if (!$argument instanceof TrueEntity && !$argument instanceof FalseEntity) {
+                        $argument = $this->parseExpression($argument, $methods, $locals);
+                    }
+                    return $object->and($argument);
+
+                case "or:":
+                    if (!$argument instanceof TrueEntity && !$argument instanceof FalseEntity) {
+                        $argument = $this->parseExpression($argument, $methods, $locals);
+                    }
+                    return $object->or($argument);
+
+                case "ifTrue:ifFalse:":
+                    if ($object instanceof TrueEntity) {
+                        return $this->parseBlock($arguments[1], $arguments, $methods, setParams: false);
+                    }else{
+                        return $this->parseBlock($arguments[2], $arguments, $methods, setParams: false);
+                    }
+            }
+        }
+        // do not understand
+        throw new InterpreterError(ErrorCode::INT_DNU);
     }
 }

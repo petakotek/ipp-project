@@ -36,6 +36,17 @@ final class FalseEntity extends ObjectEntity
         return TrueEntity::getInstance();
     }
 
+    public function and(mixed $cilovyObjekt) : FalseEntity {
+        return FalseEntity::getInstance();
+    }
+
+    public function or(mixed $cilovyObjekt): FalseEntity | TrueEntity
+    {
+        if ($cilovyObjekt instanceof TrueEntity) {
+            return TrueEntity::getInstance();
+        }
+        return FalseEntity::getInstance();
+    }
 
 //    public function and(TrueEntity $cilovyObjekt) : bool{
 //    }

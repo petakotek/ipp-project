@@ -2,6 +2,7 @@
 
 namespace IPP\Interpreter\Classes\Common;
 
+use IPP\Interpreter\Classes\BlockEntity;
 use IPP\Interpreter\Classes\ObjectEntity;
 use IPP\Interpreter\Exception\ErrorCode;
 use IPP\Interpreter\Exception\InterpreterError;
@@ -50,9 +51,8 @@ final class IntegerEntity extends ObjectEntity implements Instantiable
             // deleni nulou vede na chybu 53
             throw new InterpreterError(ErrorCode::INT_INVALID_ARG);
         }
-        return new IntegerEntity($this->value / $cilovyObjekt->value);
+        return new IntegerEntity(intdiv($this->value, $cilovyObjekt->value));
     }
-    ///
     public function asString(): object
     {
         return new StringEntity((string)$this->value);
@@ -69,9 +69,10 @@ final class IntegerEntity extends ObjectEntity implements Instantiable
     }
 
     // TBD
-//    public function timesRepeat(){
-//
-//    }
+    public function timesRepeat(int $index): IntegerEntity
+    {
+        return new IntegerEntity($index);
+    }
 
     public static function new(): static
     {
