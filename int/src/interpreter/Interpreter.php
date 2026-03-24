@@ -271,13 +271,16 @@ class Interpreter
     }
     /**
      * @param array<int, mixed> $arguments - volitelne mnozstvi argumentuu
+     * @param array<Method> $methods
      * */
-    public function parseBlock(BlockEntity $block, array $arguments, array $methods): object
+    public function parseBlock(BlockEntity $block, array $arguments, array $methods, bool $setParams): object
     {
         $locals = [];
         $lastAssign = null;
+        if ($setParams) {
+            $locals = $this->fillParameters($block->locals, $arguments);
+        }
 
-        $locals = $this->fillParameters($block->locals, $arguments);
         foreach ($block->assigns as $assign) {
                 $locals[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $locals);
                 $lastAssign = $assign->target->name;
@@ -415,9 +418,9 @@ class Interpreter
         if ($object instanceof BlockEntity) {
             switch ($selector) {
                 case "value":
-                    break;
+                    return $this->parseBlock($object, $arguments, $methods, setParams: false);
                 case str_repeat("value:", count($arguments)):
-                    return $this->parseBlock($object, $arguments, $methods);
+                    return $this->parseBlock($object, $arguments, $methods, setParams: true);
             }
         }
 

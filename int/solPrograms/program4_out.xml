@@ -4,18 +4,20 @@
     <method selector="run">
       <block arity="0">
         <assign order="1">
-          <var name="_"/>
+          <var name="b0"/>
           <expr>
-            <send selector="fo:">
-              <expr>
-                <var name="self"/>
-              </expr>
-              <arg order="1">
+            <block arity="0">
+              <assign order="1">
+                <var name="_"/>
                 <expr>
-                  <literal class="Integer" value="4"/>
+                  <send selector="print">
+                    <expr>
+                      <literal class="String" value=" ahoj z bloku "/>
+                    </expr>
+                  </send>
                 </expr>
-              </arg>
-            </send>
+              </assign>
+            </block>
           </expr>
         </assign>
         <assign order="2">
@@ -128,6 +130,16 @@
                   <literal class="Integer" value="4"/>
                 </expr>
               </arg>
+            </send>
+          </expr>
+        </assign>
+        <assign order="7">
+          <var name="_"/>
+          <expr>
+            <send selector="value">
+              <expr>
+                <var name="b0"/>
+              </expr>
             </send>
           </expr>
         </assign>

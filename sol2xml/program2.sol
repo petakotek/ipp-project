@@ -1,6 +1,7 @@
 class Main : Object {
   run
     [ |
+      b0 := [ | _ := ' ahoj z bloku ' print. ].
       b1 := [ :x :y |
             a := x plus: 1.
             b := y.
@@ -11,7 +12,7 @@ class Main : Object {
       _ := ' ' print.
       xx := self foo: ('5' asInteger) f: 4.
 
-
+      _ := b0 value.
     ]
   foo:f: [:x :y |
      _ := 'Dusan says: ' print.
