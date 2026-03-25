@@ -4,6 +4,12 @@ class A : Object {
         _ := 'hodnota x: ' print.
         _ := (x asString) print.
         _ := ' ' print.
+        _ := 'ted to prijde: ' print.
+        _ := self foo.
+        _ := ' ' print.
+    ]
+    foo [ |
+        _ := 'ahoj foo A' print.
     ]
 }
 
@@ -15,9 +21,17 @@ class B : A {
 class Main : Object {
   run
     [ |
-      q := A new.
+      haha := [ | _ := self foo. ].
+      _ := haha value.
+      _ := ' | testoval jsem | ' print.
+      q := B new.
       c := B new.
       _ := c aa: 5.
-      _ := c bb.
+      _ := self foo.
+      _ := ' |= ' print.
+      _ := q foo.
     ]
+  foo [ |
+     _ := 'ahoj foo Main' print.
+  ]
 }

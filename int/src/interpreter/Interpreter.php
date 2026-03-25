@@ -110,7 +110,7 @@ class Interpreter
             if ($class->name == "Main" && $class->parent != "") {
                 $parentClass = $class->parent;
                 // pokud je to Object, tak urcite existuje
-                if ($class->parent == "Object") {
+                if ($class->parent != "") {
                     $parentClassExists = true;
                 // jinak vyhledam v poli trid
                 } elseif (array_key_exists($parentClass, $this->currentProgram->classes)) {
@@ -121,7 +121,10 @@ class Interpreter
                 }
                 if ($parentClass != $class->name) {
                     $isMainClass = true;
-                    $this->parseRunMethod($class->methods);
+                    $locals = [];
+                    $main = $this->createNewClassEntity($class->name, $locals);
+                    $locals[$main->className] = $main;
+                    $this->parseRunMethod($class->methods, $locals, $main);
                 } else {
                     throw new InterpreterError(ErrorCode::SEM_ERROR);
                 }
@@ -141,10 +144,8 @@ class Interpreter
      * Funkce na zpracování metody Run, odtud startuje hlavní chování programu
      * @param array<Method> $methods
      */
-    public function parseRunMethod(array $methods): void
+    public function parseRunMethod(array $methods, array $locals, ClassEntity $actualClass): void
     {
-        $locals = [];
-
         $isRunMethod = false;
         foreach ($methods as $method) {
             if ($method->selector == "run") {
@@ -152,15 +153,14 @@ class Interpreter
                 // zpracovani vsech prirazeni
                 foreach ($method->block->assigns as $assign) {
                     if ($assign->target->name == "_") {
-                        $this->parseExpression($assign->expr, $methods, $locals);
+                        $this->parseExpression($assign->expr, $methods, $locals, $actualClass);
                     } else {
                         $target = $assign->target->name;
-                        $locals[$target] = $this->parseExpression($assign->expr, $methods, $locals);
+                        $locals[$target] = $this->parseExpression($assign->expr, $methods, $locals, $actualClass);
                     }
                 }
             }
         }
-        var_dump($locals);
         if (!$isRunMethod) {
             // chybi metoda run
             throw new InterpreterError(ErrorCode::SEM_MAIN);
@@ -173,20 +173,20 @@ class Interpreter
      * @param array<Method> $methods
      * @param array<mixed> $lokalniPromenne
      */
-    public function parseExpression(Expr $expr, array $methods, array &$lokalniPromenne): object
+    public function parseExpression(Expr $expr, array $methods, array &$locals, ClassEntity $actualClass): object
     {
         if ($expr->literal != null) {   // kdyz vyrazem je literal
-            return $this->assignTo($expr->literal, $lokalniPromenne);
+            return $this->assignTo($expr->literal, $locals);
         } elseif ($expr->block != null) {   // kdyz vyrazem bude block
-            return $this->assignTo($expr->block, $lokalniPromenne);
+            return $this->assignTo($expr->block, $locals);
         } elseif ($expr->send != null) {
             $receiver = $expr->send->receiver; // receiver je nejaky vyraz
             $selector = $expr->send->selector;
             $arguments = $expr->send->args;
-            return $this->sendMsg($receiver, $selector, $arguments, $methods, $lokalniPromenne);
+            return $this->sendMsg($receiver, $selector, $arguments, $methods, $locals, $actualClass);
         } elseif ($expr->variable != null) {
             // vraci Variable pokud je to self
-            $returnObject = $this->assignTo($expr->variable, $lokalniPromenne);
+            $returnObject = $this->assignTo($expr->variable, $locals);
             return $returnObject;
         }
         return new ObjectEntity();
@@ -198,7 +198,7 @@ class Interpreter
      * @param object $object
      * @param array<mixed> $lokalniPromenne
      */
-    public function assignTo(object $object, array &$lokalniPromenne): object
+    public function assignTo(object $object, array &$locals): object
     {
         if ($object instanceof Literal) {
             if ($object->classId == "Integer") {
@@ -230,7 +230,7 @@ class Interpreter
                         return FalseEntity::getInstance();
                     default:
                         // vytvoreni instance nove tridy s identifikatorem value
-                        return $this->createNewClassEntity($object->value, $lokalniPromenne);
+                        return $this->createNewClassEntity($object->value, $locals);
                 }
             }
         }
@@ -239,15 +239,15 @@ class Interpreter
             if ($object->name == "self" || $object->name == "super") {
                 return $object;
             }
-            if (array_key_exists($object->name, $lokalniPromenne)) {
-                return $lokalniPromenne[$object->name];
+            if (array_key_exists($object->name, $locals)) {
+                return $locals[$object->name];
             } else {
                 // chyba, pouziti nedefinovane promenne
                 throw new InterpreterError(ErrorCode::SEM_UNDEF);
             }
         }
         if ($object instanceof Block) {
-            return new BlockEntity($object, $lokalniPromenne);
+            return new BlockEntity($object, $locals);
         }
         return new $object();
     }
@@ -287,7 +287,7 @@ class Interpreter
      * @param array<Method> $methods
      * @param array<int, mixed> $arguments - volitelne mnozstvi argumentuu
      * */
-    public function parseMethod(array $methods, string $selector, array $arguments): ?object
+    public function parseMethod(array $methods, string $selector, array $arguments, ClassEntity $actualClass): ?object
     {
         $locals = [];
         $lastAssign = null;
@@ -295,8 +295,9 @@ class Interpreter
             if ($method->selector == $selector) {
                 $locals = $this->fillParameters($method->block->parameters, $arguments);
                 foreach ($method->block->assigns as $assign) {
-                    $locals[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $locals);
                     $lastAssign = $assign->target->name;
+                    $locals[$lastAssign] = $this->parseExpression($assign->expr, $methods, $locals, $actualClass);
+
                 }
                 if ($lastAssign != null) {
                     return $locals[$lastAssign];
@@ -313,7 +314,7 @@ class Interpreter
      * @param array<int, mixed> $arguments - volitelne mnozstvi argumentuu
      * @param array<Method> $methods
      * */
-    public function parseBlock(BlockEntity $block, array $arguments, array $methods, bool $setParams): object
+    public function parseBlock(BlockEntity $block, array $arguments, array $methods, bool $setParams, ClassEntity $actualClass): object
     {
         $locals = [];
         $lastAssign = null;
@@ -322,7 +323,7 @@ class Interpreter
         }
 
         foreach ($block->assigns as $assign) {
-                $locals[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $locals);
+                $locals[$assign->target->name] = $this->parseExpression($assign->expr, $methods, $locals, $actualClass);
                 /// pokud je tato promenna uz deklarovana v nadtride, tak dojde k jeji aktualizaci
                 /// v nadbloku
             if (isset($block->upperLocals[$assign->target->name])) {
@@ -334,6 +335,7 @@ class Interpreter
     }
 
     /**
+     * Nastavi parametry promenne pro jejich vyuziti pri volani metody s parametry
      * @param array<Parameter> $parameters
      * @param array<int, mixed> $arguments
      * @return array<string, mixed>
@@ -356,15 +358,15 @@ class Interpreter
      * @param array<Method> $methods
      * @param array<mixed>$locals - lokalni promenne v danem bloku metody
      */
-    public function sendMsg(Expr $receiver, string $selector, array $args, array $methods, array &$locals): object
+    public function sendMsg(Expr $receiver, string $selector, array $args, array $methods, array &$locals, ClassEntity $actualClass): ?object
     {
         // parseAssign pro receiver
         $arguments = [];
         $argument = null;
-        $object = $this->parseExpression($receiver, $methods, $locals);
+        $object = $this->parseExpression($receiver, $methods, $locals, $actualClass);
         if ($args != null) {
             foreach ($args as $arg) {
-                $arguments[$arg->order] = $this->parseExpression($arg->expr, $methods, $locals);
+                $arguments[$arg->order] = $this->parseExpression($arg->expr, $methods, $locals, $actualClass);
             }
 //            var_dump($arguments);
             $argument = $arguments[1];
@@ -376,13 +378,37 @@ class Interpreter
                 foreach ($methods as $method) {
                     if ($method->selector == $selector) {
                         // provede danou metodu celou
-                        return $this->parseMethod($methods, $selector, $arguments);
+                        return $this->parseMethod($methods, $selector, $arguments, $actualClass);
+                    // metoda se nenasla, zkusime o tridu vys
                     }
                 }
-                throw new InterpreterError(ErrorCode::SEM_UNDEF);
-            }
-        }
+                if ($actualClass->parentClassDefined != null) {
+                    if ($actualClass->parentClassDefined->methods != null) {
+                        $parentMethods = $actualClass->parentClassDefined->methods;
+                        $parentClass = $actualClass->parentClassDefined;
 
+                        // v pripade, ze je argument super, tak je zaroven i self (svuj vlastni Object, v tomto pripade trida)
+                        if ($argument != null){
+                            if ($argument->name == "super")
+                                $arguments[1] = $actualClass;
+                        }
+
+                        return $this->parseMethod($parentMethods, $selector, $arguments, $parentClass);
+                    }
+                }
+            }
+            if ($object->name == "super") {
+                // zacinam hledat v parent tride
+                if ($actualClass->parentClassDefined != null) {
+                    if ($actualClass->parentClassDefined->methods != null) {
+                        $parentMethods = $actualClass->parentClassDefined->methods;
+                        $parentClass = $actualClass->parentClassDefined;
+                        return $this->parseMethod($parentMethods, $selector, $arguments, $parentClass);
+                    }
+                }
+            }
+            throw new InterpreterError(ErrorCode::SEM_UNDEF);
+        }
 
         // metody, ktere jsou pro vsechny objekty spolecne
         switch ($selector) {
@@ -469,7 +495,7 @@ class Interpreter
                     if ($argument instanceof BlockEntity) {
                         for ($i = 1; $i <= $object->value; $i++) {
                             $arr[1] = $object->timesRepeat($i);
-                            $returnObject = $this->parseBlock($argument, $arr, $methods, setParams: true);
+                            $returnObject = $this->parseBlock($argument, $arr, $methods, setParams: true, actualClass: $actualClass);
                         }
                     }
                     if ($returnObject instanceof BlockEntity) {
@@ -481,9 +507,9 @@ class Interpreter
         if ($object instanceof BlockEntity) {
             switch ($selector) {
                 case "value":
-                    return $this->parseBlock($object, $arguments, $methods, setParams: false);
+                    return $this->parseBlock($object, $arguments, $methods, setParams: false, actualClass: $actualClass);
                 case str_repeat("value:", count($arguments)):
-                    return $this->parseBlock($object, $arguments, $methods, setParams: true);
+                    return $this->parseBlock($object, $arguments, $methods, setParams: true, actualClass: $actualClass);
             }
         }
 
@@ -493,23 +519,25 @@ class Interpreter
                     return $object->not();
 
                 case "and:":
+                    // pokud se jedna jeste o nejaky vyraz a nemame jeste Objekt
                     if ($argument instanceof Expr) {
-                        $argument = $this->parseExpression($argument, $methods, $locals);
+                        $argument = $this->parseExpression($argument, $methods, $locals, $actualClass);
                     }
                     return $object->and($argument);
 
-                case "or:":
+                    case "or:":
+                    // pokud se jedna jeste o nejaky vyraz a nemame jeste Objekt
                     if ($argument instanceof Expr) {
-                        $argument = $this->parseExpression($argument, $methods, $locals);
+                        $argument = $this->parseExpression($argument, $methods, $locals, $actualClass);
                     }
                     return $object->or($argument);
 
                 case "ifTrue:ifFalse:":
                     if ($arguments != null) {
                         if ($object instanceof TrueEntity) {
-                            return $this->parseBlock($arguments[1], $arguments, $methods, setParams: false);
+                            return $this->parseBlock($arguments[1], $arguments, $methods, setParams: false, actualClass: $actualClass);
                         } else {
-                            return $this->parseBlock($arguments[2], $arguments, $methods, setParams: false);
+                            return $this->parseBlock($arguments[2], $arguments, $methods, setParams: false, actualClass: $actualClass);
                         }
                     }
             }
@@ -520,17 +548,18 @@ class Interpreter
             if ($object->methods == null) {
                 throw new InterpreterError(ErrorCode::INT_OTHER);
             }
-            $result = $this->parseMethod($object->methods, $selector, $arguments);
+            $result = $this->parseMethod($object->methods, $selector, $arguments, $object);
             if ($result == null) {
                 // metoda neni definovana v zadnem rodici tridy
                 if ($object->parentClassDefined == null) {
                     throw new InterpreterError(ErrorCode::SEM_UNDEF);
                 }
                 // test nalezeni metody v jeho nadtride
-                $result = $this->parseMethod($object->parentClassDefined->methods, $selector, $arguments);
+                $result = $this->parseMethod($object->parentClassDefined->methods, $selector, $arguments, $object->parentClassDefined);
             }
             return $result;
         }
+
         // do not understand
         throw new InterpreterError(ErrorCode::INT_DNU);
     }
