@@ -70,7 +70,8 @@ final class StringEntity extends ObjectEntity implements Instantiable
         return TrueEntity::getInstance();
     }
 
-    public function startsWidthEndsBefore(int $start, int $end) : StringEntity{
+    public function startsWidthEndsBefore(int $start, int $end): StringEntity
+    {
         $start -= 1;
         $end -= 1;
         $length = $end - $start;

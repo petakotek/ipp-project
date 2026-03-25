@@ -36,7 +36,8 @@ final class FalseEntity extends ObjectEntity
         return TrueEntity::getInstance();
     }
 
-    public function and(mixed $cilovyObjekt) : FalseEntity {
+    public function and(mixed $cilovyObjekt): FalseEntity
+    {
         return FalseEntity::getInstance();
     }
 
@@ -47,13 +48,6 @@ final class FalseEntity extends ObjectEntity
         }
         return FalseEntity::getInstance();
     }
-
-//    public function and(TrueEntity $cilovyObjekt) : bool{
-//    }
-
-//    public function or(IntegerEntity $cilovyObjekt){}
-
-//    public function ifTrue(IntegerEntity $cilovyObjekt){}
 
     public function isBoolean(): TrueEntity
     {
