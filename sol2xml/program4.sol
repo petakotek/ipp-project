@@ -24,6 +24,9 @@ class C : B {
 class Main : Object {
   run
     [ |
-      c := C new.
-    ]
+
+        x := 5.
+        ee := [:x | _ := (x asString) print. ].
+        _ := ee value: x.
+      ]
 }

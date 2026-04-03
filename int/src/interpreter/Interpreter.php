@@ -6,7 +6,7 @@
  * IPP: You must definitely modify this file. Bend it to your will.
  *
  * Author: Ondrej Ondryas <iondryas@fit.vut.cz>
- * Author:
+ * Author: Petr Kotek <xkotekp00>
  *
  * AI usage notice: The template author used OpenAI Codex to create the implementation of this
  *                  module based on its Python counterpart.
@@ -161,6 +161,9 @@ class Interpreter
                 }
             }
         }
+
+//        var_dump($locals);
+
         if (!$isRunMethod) {
             // chybi metoda run
             throw new InterpreterError(ErrorCode::SEM_MAIN);
@@ -498,9 +501,8 @@ class Interpreter
                             $returnObject = $this->parseBlock($argument, $arr, $methods, setParams: true, actualClass: $actualClass);
                         }
                     }
-                    if ($returnObject instanceof BlockEntity) {
-                        return $returnObject;
-                    }
+                    return $returnObject;
+
             }
         }
 
@@ -560,7 +562,7 @@ class Interpreter
             return $result;
         }
 
-        // do not understand
+        // does not understand
         throw new InterpreterError(ErrorCode::INT_DNU);
     }
 }
