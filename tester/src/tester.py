@@ -265,7 +265,7 @@ def main() -> None:
     for file in dir_list:
         if file.suffix == ".test":
             get_test_parameters(file)
-
+    #
     # Enable debug or info logging if the verbose flag was set twice or once
     if args.verbose >= 2:
         logging.root.setLevel(logging.DEBUG)
