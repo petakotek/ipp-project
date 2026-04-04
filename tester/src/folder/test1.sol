@@ -1,8 +1,3 @@
-*** init test
-+++ BASIC
-!C! 1
->>> 1
-
 class A : Object {
     m: [:x |
         _ := x print.

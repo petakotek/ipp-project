@@ -19,10 +19,11 @@ import os
 import pathlib
 import subprocess
 import sys
-from enum import Enum
+import sol_to_xml
 from pathlib import Path
 
-from models import TestReport
+
+from models import TestReport, TestCaseDefinition, TestCaseType, TestResult
 
 logger = logging.getLogger("main")
 
@@ -187,18 +188,18 @@ def run_interpreter(filepath) -> None:
     print(script_response.decode("utf-8"))
 
 
-def get_test_parameters(filepath):
-    description: str = "" # popis testu
+def get_test_parameters(test_file, in_file, out_file):
+    description: str = ""  # popis testu
     category: str = ""  # kategorie testu
-    expected_code_sol: int = -1  # ocekavany navratovy kod sol2xml
-    expected_out_int: list = []  # ocekavany obsah stdout interpretu
+    expected_code_sol: list | None = []  # ocekavany navratovy kod sol2xml
+    expected_out_int: list | None = []  # ocekavany obsah stdout interpretu
     test_weight: int = -1  # vaha testu
-    t_type: TestType = TestType.UNSPECIFIED
-    src_code : list = []
+    t_type: TestCaseType = TestCaseType.EXECUTE_ONLY
+    src_code: list = []
 
-    is_int = False # uz interpretovany kod
+    is_int = False  # uz interpretovany kod
 
-    with Path.open(filepath) as reader:
+    with Path.open(test_file) as reader:
         # Read and print the entire file line by line
         for line in reader:
             if line.startswith("***"):
@@ -206,7 +207,7 @@ def get_test_parameters(filepath):
             if line.startswith("+++"):
                 category = line.replace("***", "").strip()
             if line.startswith("!C!"):
-                expected_code_sol = int(line.replace("!C!", "").strip())
+                expected_code_sol.append(line.replace("!C!", "").strip())
             if line.startswith("!I!"):
                 expected_out_int.append(line.replace("!I!", "").strip())
             if line.startswith(">>>"):
@@ -223,19 +224,68 @@ def get_test_parameters(filepath):
         is_int = True
 
     if is_int:
-        t_type = TestType.ONLY_INT
+        t_type = TestCaseType.EXECUTE_ONLY
 
     # kod je sol ale neni speficifovan navratovy kod sol2xml
-    if not is_int and expected_code_sol == -1:
+    if not is_int and not expected_code_sol:
         print("kod je sol ale neni speficifovan navratovy kod sol2xml", file=sys.stderr)
         return None
 
     # sol2xml ne, interpret jo, kod neni xml
-    if expected_code_sol != -1 and expected_out_int and not is_int:
-        t_type = TestType.BOTH
+    if expected_code_sol and expected_out_int and not is_int:
+        t_type = TestCaseType.COMBINED
     if not expected_out_int and not is_int:
-        t_type = TestType.ONLY_SOL2XML
-    return Test(description, category, expected_code_sol, expected_out_int, test_weight, t_type)
+        t_type = TestCaseType.PARSE_ONLY
+
+    if not expected_code_sol:
+        expected_code_sol = None
+    if not expected_out_int:
+        expected_out_int = None
+
+    test = TestCase(
+        name=test_file.stem,
+        test_source_path=test_file,
+        stdin_file=in_file,
+        expected_stdout_file=out_file,
+        # z TestCaseDefinition
+        test_type=t_type,
+        description=description,
+        category=category,
+        points=test_weight,
+        expected_parser_exit_codes=expected_code_sol,
+        expected_interpreter_exit_codes=expected_out_int,
+        src_code=src_code,
+    )
+    return test
+
+
+def write_to_file(actual_test, suffix):
+    file_full_path = actual_test.test_source_path.with_suffix(suffix)
+    with open(file_full_path, "w") as tester:  # zapis kodu do souboru
+        tester.writelines(actual_test.src_code)
+
+    return file_full_path
+
+
+def start_test(actual_test):
+    if actual_test.test_type == TestCaseType.PARSE_ONLY:
+        file_full_path = write_to_file(actual_test, ".sol")
+
+        result = subprocess.run(
+            f"../.venv/bin/python sol_to_xml.py {file_full_path} > tmp.xml",
+            shell=True,
+            text=True,
+        )
+        if result.returncode in actual_test.expected_parser_exit_codes:
+            print(TestResult.PASSED)
+        else:
+            print(TestResult.UNEXPECTED_PARSER_EXIT_CODE)
+
+    if actual_test.test_type == TestCaseType.EXECUTE_ONLY:
+        file_full_path = write_to_file(actual_test, ".xml")
+
+    if actual_test.test_type == TestCaseType.COMBINED:
+        file_full_path = write_to_file(actual_test, ".sol")
 
 
 def main() -> None:
@@ -262,10 +312,28 @@ def main() -> None:
     # pole kde budou ulozeny instance testu
     tests_list = []
 
+    test_files: list | None = []
+    in_files: list | None = []
+    out_files: list | None = []
+    # nacteni vsech souboru podle kategorii
     for file in dir_list:
         if file.suffix == ".test":
-            get_test_parameters(file)
-    ##
+            test_files.append(file)
+        if file.suffix == ".out":
+            out_files.append(file)
+        if file.suffix == ".in":
+            in_files.append(file)
+
+    actual_test: TestCase
+    for test_file in test_files:
+        test_file = pathlib.Path(test_file)
+        # najde soubory stejneho jmena pokud jsou, jinak je oznaci None
+        in_file = next((f for f in in_files if f.stem == test_file.stem), None)
+        out_file = next((f for f in out_files if f.stem == test_file.stem), None)
+
+        actual_test = get_test_parameters(test_file, in_file, out_file)
+        start_test(actual_test)
+
     # Enable debug or info logging if the verbose flag was set twice or once
     if args.verbose >= 2:
         logging.root.setLevel(logging.DEBUG)
@@ -277,35 +345,9 @@ def main() -> None:
     # write_result(report, args.output)
 
 
-
-class TestType(Enum):
-    """Reprezentuje enumerator typu testu"""
-    UNSPECIFIED = 0,
-    ONLY_SOL2XML = 1,
-    ONLY_INT = 2,
-    BOTH = 3
-
-
-
-# trida reprezentujici jeden test
-class Test:
-    """Reprezentuje strukturu jednoho testu"""
-    description : str # popis testu
-    category: str # kategorie testu
-    expected_return_code_sol : list # ocekavany navratovy kod sol2xml
-    expected_return_out_int : str # ocekavany obsah stdout interpretu
-    test_weight : int # vaha testu
-
-    t_type: TestType
-
-    def __init__(self, description, category, code_sol, out_int, test_weight, t_type) -> None:
-        self.description = description
-        self.category = category
-        self.expected_return_code_sol = code_sol
-        self.expected_return_out_int = out_int
-        self.test_weight = test_weight
-        self.t_type = t_type
-
+# vlastni struktura TestCase, ktera je jeste rozsirena o zdrojovy kod
+class TestCase(TestCaseDefinition):
+    src_code: list | None = []
 
 
 if __name__ == "__main__":
