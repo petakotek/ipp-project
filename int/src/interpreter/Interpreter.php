@@ -174,6 +174,7 @@ class Interpreter
                 }
             }
         }
+        var_dump($interface->stack);
 
         if (!$isRunMethod) {
             // chybi metoda run
@@ -500,9 +501,10 @@ class Interpreter
                         return $object->startsWidthEndsBefore($arguments[1]->value, $arguments[2]->value);
                     }
                     throw new InterpreterError(ErrorCode::INT_INVALID_ARG);
-
                 case "length":
                     return $object->length();
+                case "read":
+                    return $object::read($interface->file);
             }
         }
         // metody, ktere muze provadet IntegerEntity

@@ -23,9 +23,12 @@ class C : B {
 class Main : C {
   run
     [ |
-      c := C new.
+     " c := C new.
       _ := c m: 'foo'.
       _ := c u.
-      _ := c r.
+      _ := c r."
+      x := String read.
+      y := String read.
+      z := String read.
     ]
 }

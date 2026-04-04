@@ -2,8 +2,8 @@
 
 namespace IPP\Interpreter\Classes\Common;
 
-use IPP\Interpreter\Classes\Common\NilEntity;
 use IPP\Interpreter\Classes\ObjectEntity;
+use SplFileObject;
 
 final class StringEntity extends ObjectEntity implements Instantiable
 {
@@ -12,12 +12,6 @@ final class StringEntity extends ObjectEntity implements Instantiable
     {
         parent::__construct();
         $this->value = $value;
-    }
-    // TBD
-    /// nacteni retezce z jednoho radku vstupu a vytvoreni odpovidajici instance StringEntity
-    public static function read(): StringEntity
-    {
-        return new StringEntity('');
     }
     /// vytiskne retezec na vystup, vraci self
     public function print(): StringEntity
@@ -84,5 +78,12 @@ final class StringEntity extends ObjectEntity implements Instantiable
     public static function from(mixed $parameter): static
     {
         return new self($parameter);
+    }
+    public static function read(SplFileObject $object) : static{
+        $object->setFlags(SplFileObject::READ_CSV |
+            SplFileObject::SKIP_EMPTY |
+            SplFileObject::READ_AHEAD |
+            SplFileObject::DROP_NEW_LINE);
+        return new self($object->fgets());
     }
 }

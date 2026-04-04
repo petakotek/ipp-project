@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<program language="SOL26">
+<program language="SOL26" description=" c := C new.&#10;      _ := c m: 'foo'.&#10;      _ := c u.&#10;      _ := c r.">
   <class name="A" parent="Object">
     <method selector="m:">
       <block arity="1">
@@ -102,46 +102,31 @@
     <method selector="run">
       <block arity="0">
         <assign order="1">
-          <var name="c"/>
+          <var name="x"/>
           <expr>
-            <send selector="new">
+            <send selector="read">
               <expr>
-                <literal class="class" value="C"/>
+                <literal class="class" value="String"/>
               </expr>
             </send>
           </expr>
         </assign>
         <assign order="2">
-          <var name="_"/>
+          <var name="y"/>
           <expr>
-            <send selector="m:">
+            <send selector="read">
               <expr>
-                <var name="c"/>
+                <literal class="class" value="String"/>
               </expr>
-              <arg order="1">
-                <expr>
-                  <literal class="String" value="foo"/>
-                </expr>
-              </arg>
             </send>
           </expr>
         </assign>
         <assign order="3">
-          <var name="_"/>
+          <var name="z"/>
           <expr>
-            <send selector="u">
+            <send selector="read">
               <expr>
-                <var name="c"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-        <assign order="4">
-          <var name="_"/>
-          <expr>
-            <send selector="r">
-              <expr>
-                <var name="c"/>
+                <literal class="class" value="String"/>
               </expr>
             </send>
           </expr>
