@@ -7,30 +7,25 @@ use IPP\Interpreter\InputModel\Block;
 
 class BlockEntity extends ObjectEntity
 {
-    // localni promenne instance bloku
-    /** @var array<mixed> $locals */
-    public array $locals = [];
+    public ProgramInterface $interface;
     /** @var array<mixed> $assigns */
     public array $assigns = [];
-    /** @var array<mixed> $upperLocals */
-    public array $upperLocals = [];
+
     public int $arity = 0;
-    /// TODO: potřeba implementovat nějaký rozsah platnosti pro bloky
-    /// nejspíš asi vytvořit nějaké rozhraní a následně v tomto
-    /// rozhraní mít pole scope, gettery settery
-    ///
-    ///
+
+    public array $parameters = [];
+
     /**
      * @param Block $block
      * @param array<mixed> $lcs
      */
-    public function __construct(Block $block, array &$lcs)
+    public function __construct(Block $block, ProgramInterface $iface)
     {
         parent::__construct();
-        $this->locals = $block->parameters;
+        $this->interface = $iface;
         $this->assigns = $block->assigns;
         $this->arity = $block->arity;
-        $this->upperLocals = &$lcs;
+        $this->parameters = $block->parameters;
     }
     public function isBlock(): TrueEntity
     {

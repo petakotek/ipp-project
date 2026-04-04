@@ -81,16 +81,6 @@
             </send>
           </expr>
         </assign>
-        <assign order="2">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
-              <expr>
-                <literal class="String" value="bar"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
       </block>
     </method>
     <method selector="print">
@@ -108,49 +98,51 @@
       </block>
     </method>
   </class>
-  <class name="Main" parent="Object">
+  <class name="Main" parent="C">
     <method selector="run">
       <block arity="0">
         <assign order="1">
-          <var name="x"/>
+          <var name="c"/>
           <expr>
-            <literal class="Integer" value="5"/>
+            <send selector="new">
+              <expr>
+                <literal class="class" value="C"/>
+              </expr>
+            </send>
           </expr>
         </assign>
         <assign order="2">
-          <var name="ee"/>
+          <var name="_"/>
           <expr>
-            <block arity="1">
-              <parameter order="1" name="x"/>
-              <assign order="1">
-                <var name="_"/>
+            <send selector="m:">
+              <expr>
+                <var name="c"/>
+              </expr>
+              <arg order="1">
                 <expr>
-                  <send selector="print">
-                    <expr>
-                      <send selector="asString">
-                        <expr>
-                          <var name="x"/>
-                        </expr>
-                      </send>
-                    </expr>
-                  </send>
+                  <literal class="String" value="foo"/>
                 </expr>
-              </assign>
-            </block>
+              </arg>
+            </send>
           </expr>
         </assign>
         <assign order="3">
           <var name="_"/>
           <expr>
-            <send selector="value:">
+            <send selector="u">
               <expr>
-                <var name="ee"/>
+                <var name="c"/>
               </expr>
-              <arg order="1">
-                <expr>
-                  <var name="x"/>
-                </expr>
-              </arg>
+            </send>
+          </expr>
+        </assign>
+        <assign order="4">
+          <var name="_"/>
+          <expr>
+            <send selector="r">
+              <expr>
+                <var name="c"/>
+              </expr>
             </send>
           </expr>
         </assign>

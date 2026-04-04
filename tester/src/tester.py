@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+# ruff: noqa: S602
 """
 An integration testing script for the SOL26 interpreter.
 
@@ -13,7 +15,11 @@ Author: Ondřej Ondryáš <iondryas@fit.vut.cz>
 
 import argparse
 import logging
+import os
+import pathlib
+import subprocess
 import sys
+from enum import Enum
 from pathlib import Path
 
 from models import TestReport
@@ -130,13 +136,13 @@ def parse_arguments() -> CliArguments:
         "Can be used multiple times to specify multiple accepted names. "
         "Can be combined with -ic and -i.",
     )
-    arg_parser.add_argument(
-        "-g",
-        dest="regex_filters",
-        action="store_true",
-        help="When used, the filters specified with -i[ct]/-e[ct] will be interpreted as "
-        "regular expressions instead of literal strings.",
-    )  # TODO: This is optional. If you don't want to implement it, remove this argument.
+    # arg_parser.add_argument(
+    #     "-g",
+    #     dest="regex_filters",
+    #     action="store_true",
+    #     help="When used, the filters specified with -i[ct]/-e[ct] will be interpreted as "
+    #     "regular expressions instead of literal strings.",
+    # )  # TODO: This is optional. If you don't want to implement it, remove this argument.
     arg_parser.add_argument(
         "-v",
         "--verbose",
@@ -168,6 +174,70 @@ def parse_arguments() -> CliArguments:
     return args
 
 
+# Function runs interpreter on specific file and prints result to stdout
+def run_interpreter(filepath) -> None:
+    proc = subprocess.Popen(
+        f"php ../../int/src/solint.php -s {filepath}",
+        shell=True,
+        stdout=subprocess.PIPE,
+        # vypnuti xDebug modu
+        env={**os.environ, "XDEBUG_MODE": "off"},
+    )
+    script_response = proc.stdout.read()
+    print(script_response.decode("utf-8"))
+
+
+def get_test_parameters(filepath):
+    description: str = "" # popis testu
+    category: str = ""  # kategorie testu
+    expected_code_sol: int = -1  # ocekavany navratovy kod sol2xml
+    expected_out_int: list = []  # ocekavany obsah stdout interpretu
+    test_weight: int = -1  # vaha testu
+    t_type: TestType = TestType.UNSPECIFIED
+    src_code : list = []
+
+    is_int = False # uz interpretovany kod
+
+    with Path.open(filepath) as reader:
+        # Read and print the entire file line by line
+        for line in reader:
+            if line.startswith("***"):
+                description = line.replace("***", "").strip()
+            if line.startswith("+++"):
+                category = line.replace("***", "").strip()
+            if line.startswith("!C!"):
+                expected_code_sol = int(line.replace("!C!", "").strip())
+            if line.startswith("!I!"):
+                expected_out_int.append(line.replace("!I!", "").strip())
+            if line.startswith(">>>"):
+                test_weight = int(line.replace(">>>", "").strip())
+            if line.isspace():
+                src_code = reader.readlines()
+
+    # kategorie a vaha testu je povinna
+    if not category or not test_weight:
+        # print("No category or weight provided.", file=sys.stderr)
+        return None
+
+    if str(src_code[0]).startswith("<?xml"):
+        is_int = True
+
+    if is_int:
+        t_type = TestType.ONLY_INT
+
+    # kod je sol ale neni speficifovan navratovy kod sol2xml
+    if not is_int and expected_code_sol == -1:
+        print("kod je sol ale neni speficifovan navratovy kod sol2xml", file=sys.stderr)
+        return None
+
+    # sol2xml ne, interpret jo, kod neni xml
+    if expected_code_sol != -1 and expected_out_int and not is_int:
+        t_type = TestType.BOTH
+    if not expected_out_int and not is_int:
+        t_type = TestType.ONLY_SOL2XML
+    return Test(description, category, expected_code_sol, expected_out_int, test_weight, t_type)
+
+
 def main() -> None:
     """
     The main entry point for the SOL26 integration testing script.
@@ -186,17 +256,56 @@ def main() -> None:
     # Parse the CLI arguments
     args = parse_arguments()
 
+    # prazdny list pro vsechny soubory ve slozce
+    dir_list = []
+    dir_list = pathlib.Path.iterdir(args.tests_dir)
+    # pole kde budou ulozeny instance testu
+    tests_list = []
+
+    for file in dir_list:
+        if file.suffix == ".test":
+            get_test_parameters(file)
+    ##
     # Enable debug or info logging if the verbose flag was set twice or once
     if args.verbose >= 2:
         logging.root.setLevel(logging.DEBUG)
     elif args.verbose == 1:
         logging.root.setLevel(logging.INFO)
 
-    # TODO: Your code for discovering and executing the test cases goes here.
+    # # # Example of how to write the final report:
+    # report = TestReport(discovered_test_cases=[], unexecuted={}, results={})
+    # write_result(report, args.output)
 
-    # Example of how to write the final report:
-    report = TestReport(discovered_test_cases=[], unexecuted={}, results={})
-    write_result(report, args.output)
+
+
+class TestType(Enum):
+    """Reprezentuje enumerator typu testu"""
+    UNSPECIFIED = 0,
+    ONLY_SOL2XML = 1,
+    ONLY_INT = 2,
+    BOTH = 3
+
+
+
+# trida reprezentujici jeden test
+class Test:
+    """Reprezentuje strukturu jednoho testu"""
+    description : str # popis testu
+    category: str # kategorie testu
+    expected_return_code_sol : list # ocekavany navratovy kod sol2xml
+    expected_return_out_int : str # ocekavany obsah stdout interpretu
+    test_weight : int # vaha testu
+
+    t_type: TestType
+
+    def __init__(self, description, category, code_sol, out_int, test_weight, t_type) -> None:
+        self.description = description
+        self.category = category
+        self.expected_return_code_sol = code_sol
+        self.expected_return_out_int = out_int
+        self.test_weight = test_weight
+        self.t_type = t_type
+
 
 
 if __name__ == "__main__":
