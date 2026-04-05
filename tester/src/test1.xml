@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<program language="SOL26">
+<program language="SOL26" description=" c := C new.&#10;      _ := c m: 'foo'.&#10;      _ := c u.&#10;      _ := c r.">
   <class name="A" parent="Object">
     <method selector="m:">
       <block arity="1">

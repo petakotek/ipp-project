@@ -1,4 +1,4 @@
-*** init test
+*** init test 2
 +++ BASIC
 !C! 0
 >>> 1
@@ -28,6 +28,10 @@ class C : B {
 class Main : C {
   run
     [ |
+     " c := C new.
+      _ := c m: 'foo'.
+      _ := c u.
+      _ := c r."
       x := String read.
       y := String read.
       z := String read.

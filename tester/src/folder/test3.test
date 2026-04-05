@@ -1,3 +1,8 @@
+*** init test 3
++++ NONBASIC
+!C! 0
+>>> 1
+
 class A : Object {
     m: [:x |
         _ := x print.
@@ -23,6 +28,10 @@ class C : B {
 class Main : C {
   run
     [ |
+     " c := C new.
+      _ := c m: 'foo'.
+      _ := c u.
+      _ := c r."
       x := String read.
       y := String read.
       z := String read.
