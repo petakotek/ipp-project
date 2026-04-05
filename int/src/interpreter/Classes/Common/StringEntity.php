@@ -16,7 +16,7 @@ final class StringEntity extends ObjectEntity implements Instantiable
     /// vytiskne retezec na vystup, vraci self
     public function print(): StringEntity
     {
-        echo $this->value;
+        echo stripcslashes($this->value);
         return $this;
     }
     public function equalTo(object $target): TrueEntity | FalseEntity

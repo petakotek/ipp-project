@@ -368,6 +368,10 @@ class Interpreter
         $topArray = $interface->top();
         // vyhozeni aktualnich promennych bloku, vracim se totiz zpet o uroven vys
         $interface->pop();
+        // blok je prazdny, vracim Nil
+        if (!$block->assigns) {
+            return NilEntity::new();
+        }
         return $topArray[$lastAssign];
     }
 
@@ -579,6 +583,9 @@ class Interpreter
                     // pokud se jedna jeste o nejaky vyraz a nemame jeste Objekt
                     if ($argument instanceof Expr) {
                         $argument = $this->parseExpression($argument, $methods, $interface);
+                    }
+                    if ($argument instanceof BlockEntity) {
+                        $argument = $this->parseBlock($argument, $arguments, $methods, false, $interface);
                     }
                     return $object->or($argument);
 
