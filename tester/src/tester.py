@@ -20,17 +20,18 @@ import pathlib
 import subprocess
 import sys
 from pathlib import Path
+from subprocess import CompletedProcess
 
 from models import (
+    CategoryReport,
     TestCaseDefinition,
     TestCaseReport,
     TestCaseType,
     TestReport,
     TestResult,
     UnexecutedReason,
-    UnexecutedReasonCode, CategoryReport,
+    UnexecutedReasonCode,
 )
-from mypy.util import json_dumps
 
 logger = logging.getLogger("main")
 
@@ -257,7 +258,7 @@ def get_test_parameters(
                 src_code = reader.readlines()
 
     # kategorie a vaha testu je povinna
-    if not category or not test_weight:
+    if not category or test_weight == -1:
         return UnexecutedReason(
             message="Category or weight not provided.",
             code=UnexecutedReasonCode.MALFORMED_TEST_CASE_FILE,
@@ -299,6 +300,7 @@ def get_test_parameters(
         src_code=src_code,
     )
 
+
 # Funkce zapise zdrojovy kod testu do souboru se stejnym nazvem a odpovidajici priponou
 # nasledne vraci celou cestu v tomuto souboru
 def write_to_file(actual_test: TestCase, suffix: str) -> Path:
@@ -311,7 +313,16 @@ def write_to_file(actual_test: TestCase, suffix: str) -> Path:
 
 
 # Function runs interpreter on specific file and prints result to stdout
-def run_interpreter(filepath: Path) -> subprocess.CompletedProcess[str]:
+def run_interpreter(filepath: Path, stdin: Path | None) -> subprocess.CompletedProcess[str]:
+    if stdin:
+        return subprocess.run(
+            f"php ../../int/src/solint.php -s {filepath} --input {stdin}",
+            shell=True,
+            text=True,
+            capture_output=True,
+            # vypnuti xDebug modu
+            env={**os.environ, "XDEBUG_MODE": "off"},
+        )
     return subprocess.run(
         f"php ../../int/src/solint.php -s {filepath}",
         shell=True,
@@ -322,19 +333,25 @@ def run_interpreter(filepath: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def run_compiler(filepath: Path, output_file : Path) -> subprocess.CompletedProcess[str]:
+def run_compiler(filepath: Path, output_file: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         f"python sol_to_xml.py {filepath} > {output_file}",
         shell=True,
         text=True,
     )
 
-def evaluate_test(test_result, test_provided) -> TestCaseReport:
+
+def evaluate_test(
+    test_result: subprocess.CompletedProcess[str], test_provided: TestCase
+) -> TestCaseReport | None:
     complete_result: TestResult = TestResult.PASSED
 
     if test_provided.test_type == TestCaseType.PARSE_ONLY:
         complete_result = TestResult.UNEXPECTED_PARSER_EXIT_CODE
-        if test_result.returncode in test_provided.expected_parser_exit_codes:
+        if (
+            test_provided.expected_parser_exit_codes
+            and test_result.returncode in test_provided.expected_parser_exit_codes
+        ):
             complete_result = TestResult.PASSED  # pokud je navratovy kod v ocekavanych
 
         return TestCaseReport(
@@ -350,8 +367,17 @@ def evaluate_test(test_result, test_provided) -> TestCaseReport:
     # pouze interpreter
     if test_provided.test_type == TestCaseType.EXECUTE_ONLY:
         complete_result = TestResult.UNEXPECTED_INTERPRETER_EXIT_CODE
-        if test_result.returncode in test_provided.expected_interpreter_exit_codes:
+        if (
+            test_provided.expected_interpreter_exit_codes
+            and test_result.returncode in test_provided.expected_interpreter_exit_codes
+        ):
             complete_result = TestResult.PASSED
+
+        # pokud neni nastaveno je to null
+        if not test_result.stdout:
+            test_result.stdout = None
+        if not test_result.stderr:
+            test_result.stderr = None
 
         return TestCaseReport(
             result=complete_result,
@@ -363,15 +389,14 @@ def evaluate_test(test_result, test_provided) -> TestCaseReport:
             interpreter_stderr=test_result.stderr,
             diff_output=None,
         )
+    return None
 
 
 def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
     test_folder = Path("outputs/")
-    test_result: TestCaseReport
     Path.mkdir(test_folder, parents=True, exist_ok=True)
     # PARSE ONLY
     if actual_test.test_type == TestCaseType.PARSE_ONLY:
-        test_final_result_output = TestResult.UNEXPECTED_PARSER_EXIT_CODE
         file_full_path = write_to_file(actual_test, ".sol")
 
         # spusteni prekladace solu
@@ -383,23 +408,75 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
         Path.unlink(file_full_path, missing_ok=True)
         Path.unlink(output_file, missing_ok=True)
         Path.rmdir(test_folder)
-        return test_final_result
+        if test_final_result:
+            return test_final_result
 
     # EXECUTE ONLY
     if actual_test.test_type == TestCaseType.EXECUTE_ONLY:
-        test_final_result_output = TestResult.UNEXPECTED_INTERPRETER_EXIT_CODE
         file_full_path = write_to_file(actual_test, ".xml")
-        # spusteni interpretu
-        result = run_interpreter(file_full_path)
+        # spusteni interpretu, pokud je stdin file, preda se jako parametr
+        result = run_interpreter(file_full_path, actual_test.stdin_file)
         test_final_result = evaluate_test(result, actual_test)
+
+        # pokud ma test k sobe i stdout_file
+        if (
+            test_final_result and
+            test_final_result.result is not None
+            and test_final_result.result == TestResult.PASSED
+            and actual_test.expected_stdout_file
+        ):
+            diff = diff_files(actual_test, result)
+
+            if diff and diff.returncode != 0:
+                test_final_result.result = TestResult.INTERPRETER_RESULT_DIFFERS
+                test_final_result.diff_output = diff.stdout
 
         Path.unlink(file_full_path, missing_ok=True)
         Path.rmdir(test_folder)
-        return test_final_result
+
+        if test_final_result:
+            return test_final_result
 
     # COMBINATION
     if actual_test.test_type == TestCaseType.COMBINED:
         file_full_path = write_to_file(actual_test, ".sol")
+
+        # spusteni prekladace solu
+        output_file = Path(f"outputs/{actual_test.name}.xml")
+        result = run_compiler(file_full_path, output_file)
+
+        actual_test.test_type = TestCaseType.PARSE_ONLY # tmp
+        test_final_result = evaluate_test(result, actual_test)
+        actual_test.test_type = TestCaseType.COMBINED
+
+
+        if test_final_result and test_final_result.result == TestResult.PASSED:
+            result = run_interpreter(output_file, actual_test.stdin_file)
+
+            actual_test.test_type = TestCaseType.EXECUTE_ONLY
+            test_final_result = evaluate_test(result, actual_test)
+            actual_test.test_type = TestCaseType.COMBINED
+
+            # pokud ma test k sobe i stdout_file
+            if test_final_result:
+                if (
+                        test_final_result and
+                        test_final_result.result is not None
+                        and test_final_result.result == TestResult.PASSED
+                        and actual_test.expected_stdout_file
+                ):
+                    diff = diff_files(actual_test, result)
+
+                    if diff and diff.returncode != 0:
+                        test_final_result.result = TestResult.INTERPRETER_RESULT_DIFFERS
+                        test_final_result.diff_output = diff.stdout
+
+            # unlink old .xml file
+            Path.unlink(output_file, missing_ok=True)
+            Path.unlink(file_full_path, missing_ok=True)
+            Path.rmdir(test_folder)
+            if test_final_result:
+                return test_final_result
 
     Path.rmdir(test_folder)
 
@@ -409,60 +486,86 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
         code=UnexecutedReasonCode.OTHER,
     )
 
+# porovna dva soubory a vrati vysledek jako strukturu CompletedProcess[str]
+def diff_files(actual_test: TestCase, result: CompletedProcess[str]) -> CompletedProcess[str]:
+    tmp_path = Path(f"outputs/{actual_test.name}_tmp.xml")
+    tmp_path.write_text(result.stdout)
+
+    try:
+        diff = subprocess.run(
+            f"diff {actual_test.expected_stdout_file} {tmp_path}",
+            text=True,
+            capture_output=True,
+            shell=True,
+        )
+    finally:
+        Path.unlink(tmp_path, missing_ok=True)
+
+    return diff
+
 # Filtruje testy podle argumentu
-def filter_tests(args : CliArguments, discovered_tests : list[TestCase]) -> list[TestCase]:
-    result_tests : list[TestCase] = []
+def filter_tests(args: CliArguments, discovered_tests: list[TestCase]) -> list[TestCase]:
+    result_tests: list[TestCase] = []
     filter_applied = False
     if args.dry_run:
+        filter_applied = True
         return discovered_tests
     # pridat podle kategorie nebo jmena
     if args.include:
         filter_applied = True
-        for discovered_test in discovered_tests:
-            for parameter in args.include:
-                parameter = parameter.strip()
-                if discovered_test.category == parameter or discovered_test.name == parameter:
-                    result_tests.append(discovered_test)
+        stripped = [s.strip() for s in args.include]
+        result_tests.extend(
+            discovered_test
+            for discovered_test in discovered_tests
+            if discovered_test.category in stripped or discovered_test.name in stripped
+        )
 
     if args.exclude:
         filter_applied = True
-        for discovered_test in discovered_tests:
-            for parameter in args.exclude:
-                parameter = parameter.strip()
-                if discovered_test.category != parameter or discovered_test.name != parameter:
-                    result_tests.append(discovered_test)
+        stripped = [s.strip() for s in args.exclude]
+        result_tests.extend(
+            discovered_test
+            for discovered_test in discovered_tests
+            if discovered_test.category not in stripped
+            if discovered_test.name not in stripped
+        )
 
     # pridani podle kategorie
     if args.include_category:
         filter_applied = True
-        for discovered_test in discovered_tests:
-            for category in args.include_category:
-                category = category.strip()
-                if discovered_test.category == category:
-                    result_tests.append(discovered_test)
+        stripped = [s.strip() for s in args.include_category]
+        result_tests.extend(
+            discovered_test
+            for discovered_test in discovered_tests
+            if discovered_test.category in stripped
+        )
 
     if args.include_test:
         filter_applied = True
-        for discovered_test in discovered_tests:
-            for test_name in args.include_test:
-                test_name = test_name.strip()
-                if  discovered_test.name == test_name:
-                    result_tests.append(discovered_test)
+        stripped = [s.strip() for s in args.include_test]
+        result_tests.extend(
+            discovered_test
+            for discovered_test in discovered_tests
+            if discovered_test.name in stripped
+        )
+
     if args.exclude_test:
         filter_applied = True
-        for discovered_test in discovered_tests:
-            for test_name in args.exclude_test:
-                test_name = test_name.strip()
-                if  discovered_test.name != test_name:
-                    result_tests.append(discovered_test)
+        stripped = [s.strip() for s in args.exclude_test]
+        result_tests.extend(
+            discovered_test
+            for discovered_test in discovered_tests
+            if discovered_test.name not in stripped
+        )
 
     if args.exclude_category:
         filter_applied = True
-        for discovered_test in discovered_tests:
-            for test_name in args.exclude_category:
-                test_name = test_name.strip()
-                if discovered_test.name != test_name:
-                    result_tests.append(discovered_test)
+        stripped = [s.strip() for s in args.exclude_category]
+        result_tests.extend(
+            discovered_test
+            for discovered_test in discovered_tests
+            if discovered_test.category not in stripped
+        )
 
     # zadny filtr nebyl vybran, vraim vsechny testy
     if not filter_applied:
@@ -475,6 +578,58 @@ def filter_tests(args : CliArguments, discovered_tests : list[TestCase]) -> list
             seen.add(test.name)
             unique.append(test)
     return unique
+
+
+def parse_files_and_get_parameters(
+    test_file: Path, in_files: list[Path], out_files: list[Path]
+) -> TestCase | UnexecutedReason:
+    test_file = pathlib.Path(test_file)
+    # najde soubory stejneho jmena pokud jsou, jinak je oznaci None
+    in_file = next((f for f in in_files if f.stem == test_file.stem), None)
+    out_file = next((f for f in out_files if f.stem == test_file.stem), None)
+
+    return get_test_parameters(test_file, in_file, out_file)
+
+
+def process_category(
+    category: str,
+    discovered_test_cases: list[TestCase],
+    unexecuted: dict[str, UnexecutedReason],
+) -> CategoryReport:
+    total_points = 0
+    passed_points = 0
+    test_reports: dict[str, TestCaseReport] = {}
+
+    for test in (t for t in discovered_test_cases if t.category == category):
+        total_points += test.points
+        result = start_test(test)
+
+        if isinstance(result, TestCaseReport):
+            if result.result == TestResult.PASSED:
+                passed_points += test.points
+            test_reports[test.name] = result
+        elif isinstance(result, UnexecutedReason):
+            unexecuted[test.name] = result
+
+    return CategoryReport(
+        total_points=total_points,
+        passed_points=passed_points,
+        test_results=test_reports,
+    )
+
+
+# nastavi ostatni testy co neprosli filtrem jako FILTERED OUT
+def set_filtered_out_tests_to_dict(
+    unexecuted: dict[str, UnexecutedReason],
+    originals: list[TestCase],
+    discovered_test_cases: list[TestCase],
+) -> None:
+    for original_test in originals:
+        if original_test not in discovered_test_cases:
+            unexecuted[original_test.name] = UnexecutedReason(
+                message="Test was filtered out.", code=UnexecutedReasonCode.FILTERED_OUT
+            )
+
 
 def main() -> None:
     """
@@ -524,16 +679,10 @@ def main() -> None:
     # vsechny testy, ktere nebyly spusteny
     unexecuted: dict[str, UnexecutedReason] = {}
     # konecne vysledky
-    results: dict[str, CategoryReport] | None = None
+    results: dict[str, CategoryReport] = {}
 
     for test_file in test_files:
-        test_file = pathlib.Path(test_file)
-        # najde soubory stejneho jmena pokud jsou, jinak je oznaci None
-        in_file = next((f for f in in_files if f.stem == test_file.stem), None)
-        out_file = next((f for f in out_files if f.stem == test_file.stem), None)
-
-        actual_test = get_test_parameters(test_file, in_file, out_file)
-
+        actual_test = parse_files_and_get_parameters(test_file, in_files, out_files)
         if isinstance(actual_test, TestCase):
             discovered_test_cases.append(actual_test)
         if isinstance(actual_test, UnexecutedReason):
@@ -545,31 +694,23 @@ def main() -> None:
 
         # ostatni co nejsou oznacim jako FILTERED_OUT
         if discovered_test_cases and originals:
-            for original_test in originals:
-                if not original_test in discovered_test_cases:
-                    unexecuted[original_test.name] = UnexecutedReason(
-                        message="Test was filtered out.",
-                        code=UnexecutedReasonCode.FILTERED_OUT
-                    )
+            set_filtered_out_tests_to_dict(unexecuted, originals, discovered_test_cases)
 
-    test_reports: list[TestCaseReport] = []
+    # pokud neni poze dry run
+    if not args.dry_run:
+        categories: set[str] = set()
+        for discovered_test_case in discovered_test_cases:
+            categories.add(discovered_test_case.category)
 
-    categories: set[str] = set()
-    for discovered_test_case in discovered_test_cases:
-        categories.add(discovered_test_case.category)
-
-    for category in categories:
-        for discovered_test in discovered_test_cases:
-            if category == discovered_test.category:
-                test_result = start_test(discovered_test)
-        
-                if isinstance(test_result, TestCaseReport):
-                    test_reports.append(test_result)
-                if isinstance(test_result, UnexecutedReason):
-                    unexecuted[discovered_test.name] = test_result
+        results = {
+            category: process_category(category, discovered_test_cases, unexecuted)
+            for category in categories
+        }
 
     # # # Example of how to write the final report:
-    report = TestReport(discovered_test_cases=discovered_test_cases, unexecuted=unexecuted, results=results)
+    report = TestReport(
+        discovered_test_cases=discovered_test_cases, unexecuted=unexecuted, results=results
+    )
     write_result(report, args.output)
 
 

@@ -128,6 +128,7 @@ class Interpreter
                     $main = $this->createNewClassEntity($class->name);
                     // vytvoreni instance programoveho rozhrani
                     $program = new ProgramInterface(actualClass: $main, file: $inputIo);
+                    $program->selfClass = $main;
                     $this->parseRunMethod($class->methods, $program);
                 } else {
                     throw new InterpreterError(ErrorCode::SEM_ERROR);
@@ -174,7 +175,7 @@ class Interpreter
                 }
             }
         }
-        var_dump($interface->stack);
+        //var_dump($interface->stack);
 
         if (!$isRunMethod) {
             // chybi metoda run

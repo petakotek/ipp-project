@@ -28,6 +28,6 @@ class Main : C {
       _ := c m: 'foo'.
       _ := c u.
       _ := self print.
-     " _ := c r."
+      _ := c r.
     ]
 }

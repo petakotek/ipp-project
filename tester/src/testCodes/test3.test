@@ -1,0 +1,13 @@
++++ BASIC
+*** Test překladu a interpretace
+!C! 0
+!I! 0
+!I! 42
+>>> 1
+
+class Main : Object {
+  run
+    [ |
+     _ := 'ahoj test 1' print.
+    ]
+}

@@ -1,0 +1,10 @@
+*** Test bez kategorie
+!C! 0
+>>> 1
+
+class Main : Object {
+  run
+    [ |
+     _ := 'ahoj test 1' print.
+    ]
+}

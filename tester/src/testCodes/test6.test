@@ -1,0 +1,10 @@
++++ BASIC
+*** Test bez návratových kódů
+>>> 1
+
+class Main : Object {
+  run
+    [ |
+     _ := 'ahoj test 1' print.
+    ]
+}
