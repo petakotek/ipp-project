@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<program language="SOL26">
+<program language="SOL26" description="B dědí z A, redefinuje metodu m">
   <class name="A" parent="Object">
     <method selector="m:">
       <block arity="1">
@@ -81,16 +81,6 @@
             </send>
           </expr>
         </assign>
-        <assign order="2">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
-              <expr>
-                <literal class="String" value="bar"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
       </block>
     </method>
     <method selector="print">
@@ -108,7 +98,7 @@
       </block>
     </method>
   </class>
-  <class name="Main" parent="C">
+  <class name="Main" parent="Object">
     <method selector="run">
       <block arity="0">
         <assign order="1">
@@ -147,16 +137,6 @@
           </expr>
         </assign>
         <assign order="4">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
-              <expr>
-                <var name="self"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-        <assign order="5">
           <var name="_"/>
           <expr>
             <send selector="r">

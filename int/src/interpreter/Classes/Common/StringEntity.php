@@ -79,7 +79,8 @@ final class StringEntity extends ObjectEntity implements Instantiable
     {
         return new self($parameter);
     }
-    public static function read(SplFileObject $object) : static{
+    public static function read(SplFileObject $object): static
+    {
         $object->setFlags(SplFileObject::READ_CSV |
             SplFileObject::SKIP_EMPTY |
             SplFileObject::READ_AHEAD |

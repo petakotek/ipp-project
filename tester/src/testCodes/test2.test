@@ -1,177 +1,38 @@
 +++ BASIC
 *** Test pouze interpretace
 !I! 0
+!C! 0
 >>> 1
 
-<?xml version="1.0" encoding="UTF-8"?>
-<program language="SOL26">
-  <class name="A" parent="Object">
-    <method selector="m:">
-      <block arity="1">
-        <parameter order="1" name="x"/>
-        <assign order="1">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
-              <expr>
-                <var name="x"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-      </block>
-    </method>
-    <method selector="r">
-      <block arity="0">
-        <assign order="1">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
-              <expr>
-                <var name="self"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-      </block>
-    </method>
-  </class>
-  <class name="B" parent="A">
-    <method selector="m:">
-      <block arity="1">
-        <parameter order="1" name="x"/>
-        <assign order="1">
-          <var name="_"/>
-          <expr>
-            <send selector="m:">
-              <expr>
-                <var name="super"/>
-              </expr>
-              <arg order="1">
-                <expr>
-                  <literal class="String" value="ahoj"/>
-                </expr>
-              </arg>
-            </send>
-          </expr>
-        </assign>
-        <assign order="2">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
-              <expr>
-                <var name="x"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-      </block>
-    </method>
-  </class>
-  <class name="C" parent="B">
-    <method selector="u">
-      <block arity="0">
-        <assign order="1">
-          <var name="_"/>
-          <expr>
-            <send selector="m:">
-              <expr>
-                <var name="self"/>
-              </expr>
-              <arg order="1">
-                <expr>
-                  <var name="super"/>
-                </expr>
-              </arg>
-            </send>
-          </expr>
-        </assign>
-        <assign order="2">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
-              <expr>
-                <literal class="String" value="bar"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-      </block>
-    </method>
-    <method selector="print">
-      <block arity="0">
-        <assign order="1">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
-              <expr>
-                <literal class="String" value="bar"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-      </block>
-    </method>
-  </class>
-  <class name="Main" parent="C">
-    <method selector="run">
-      <block arity="0">
-        <assign order="1">
-          <var name="c"/>
-          <expr>
-            <send selector="new">
-              <expr>
-                <literal class="class" value="C"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-        <assign order="2">
-          <var name="_"/>
-          <expr>
-            <send selector="m:">
-              <expr>
-                <var name="c"/>
-              </expr>
-              <arg order="1">
-                <expr>
-                  <literal class="String" value="foo"/>
-                </expr>
-              </arg>
-            </send>
-          </expr>
-        </assign>
-        <assign order="3">
-          <var name="_"/>
-          <expr>
-            <send selector="u">
-              <expr>
-                <var name="c"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-        <assign order="4">
-          <var name="_"/>
-          <expr>
-            <send selector="print">
-              <expr>
-                <var name="self"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-        <assign order="5">
-          <var name="_"/>
-          <expr>
-            <send selector="r">
-              <expr>
-                <var name="c"/>
-              </expr>
-            </send>
-          </expr>
-        </assign>
-      </block>
-    </method>
-  </class>
-</program>
+class A : Object {
+m: [ :x | _ := x print. ]
+r [ | _ := self print. ]
+}
+class B : A { "B dědí z A, redefinuje metodu m"
+m: [ :x | _ := super m: 'ahoj'. "super -> použije se implementace z A"
+_ := x print. ]
+}
+class C : B {
+"self m najde metodu m z nadtřídy B a pošle jí jako argument instanci C (na
+místě argumentu má super stejný význam jako self)."
+u [ | _ := self m: super. ]
+print [ | _ := 'bar' print. ]
+}
+class Main : Object {
+run [ | c := C new. "Vytvoří instanci c třídy C."
+"Této instanci pošle zprávu m -> implementace se najde v B. m (z B)
+nejprve zavolá implementaci z A, což vypíše 'ahoj'. Pak m (z B)
+zavolá na argumentu print, takže se vypíše 'foo'."
+_ := c m: 'foo'.
+"Instanci c se pošle zpráva u, odpovídající metoda zavolá m (najde se v
+B) s argumentem super (= self). Ta pak volá m (z A), která pošle
+svému argumentu zprávu print. Metoda pro tuto zprávu se najde v C,
+protože instance C je tím objektem, který se poslal jako argument x."
+_ := c u.
+"Instanci c pošle zprávu r. Implementace se najde v A. Tato metoda
+posílá do self zprávu print. Protože self je v tomto kontextu
+instancí C, instance použije svou metodu print (definována v C) a
+vypíše se 'bar'."
+_ := c r.
+]
+}

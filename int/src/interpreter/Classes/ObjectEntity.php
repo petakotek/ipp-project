@@ -13,7 +13,7 @@ class ObjectEntity
     }
     public function identicalTo(object $target): TrueEntity | FalseEntity
     {
-        if ($this instanceof $target) {
+        if (get_class($this) === get_class($target)) {
             return new TrueEntity();
         }
         return new FalseEntity();

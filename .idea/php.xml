@@ -24,6 +24,11 @@
     <option name="showSniffs" value="true" />
     <option name="transferred" value="true" />
   </component>
+  <component name="PhpCSFixer">
+    <phpcsfixer_settings>
+      <phpcs_fixer_by_interpreter asDefaultInterpreter="true" interpreter_id="ce6d011a-4ade-4f9e-a525-4796d4d87f8c" timeout="30000" />
+    </phpcsfixer_settings>
+  </component>
   <component name="PhpCodeSniffer">
     <phpcs_settings>
       <PhpCSConfiguration beautifier_path="$PROJECT_DIR$/int/vendor/bin/phpcbf" tool_path="$PROJECT_DIR$/int/vendor/bin/phpcs" />

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd ../vendor/bin/
+./phpstan "$@" ../../../src/int/src

@@ -13,11 +13,14 @@ class BlockEntity extends ObjectEntity
 
     public int $arity = 0;
 
+    /**
+     * @var array|\IPP\Interpreter\InputModel\Parameter[]
+     */
     public array $parameters = [];
 
     /**
      * @param Block $block
-     * @param array<mixed> $lcs
+     * @param ProgramInterface $iface - rozhrani programu
      */
     public function __construct(Block $block, ProgramInterface $iface)
     {

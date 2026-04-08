@@ -420,8 +420,8 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
 
         # pokud ma test k sobe i stdout_file
         if (
-            test_final_result and
-            test_final_result.result is not None
+            test_final_result
+            and test_final_result.result is not None
             and test_final_result.result == TestResult.PASSED
             and actual_test.expected_stdout_file
         ):
@@ -445,10 +445,9 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
         output_file = Path(f"outputs/{actual_test.name}.xml")
         result = run_compiler(file_full_path, output_file)
 
-        actual_test.test_type = TestCaseType.PARSE_ONLY # tmp
+        actual_test.test_type = TestCaseType.PARSE_ONLY  # tmp
         test_final_result = evaluate_test(result, actual_test)
         actual_test.test_type = TestCaseType.COMBINED
-
 
         if test_final_result and test_final_result.result == TestResult.PASSED:
             result = run_interpreter(output_file, actual_test.stdin_file)
@@ -460,10 +459,10 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
             # pokud ma test k sobe i stdout_file
             if test_final_result:
                 if (
-                        test_final_result and
-                        test_final_result.result is not None
-                        and test_final_result.result == TestResult.PASSED
-                        and actual_test.expected_stdout_file
+                    test_final_result
+                    and test_final_result.result is not None
+                    and test_final_result.result == TestResult.PASSED
+                    and actual_test.expected_stdout_file
                 ):
                     diff = diff_files(actual_test, result)
 
@@ -486,6 +485,7 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
         code=UnexecutedReasonCode.OTHER,
     )
 
+
 # porovna dva soubory a vrati vysledek jako strukturu CompletedProcess[str]
 def diff_files(actual_test: TestCase, result: CompletedProcess[str]) -> CompletedProcess[str]:
     tmp_path = Path(f"outputs/{actual_test.name}_tmp.xml")
@@ -502,6 +502,7 @@ def diff_files(actual_test: TestCase, result: CompletedProcess[str]) -> Complete
         Path.unlink(tmp_path, missing_ok=True)
 
     return diff
+
 
 # Filtruje testy podle argumentu
 def filter_tests(args: CliArguments, discovered_tests: list[TestCase]) -> list[TestCase]:
