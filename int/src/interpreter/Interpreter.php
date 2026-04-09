@@ -18,6 +18,7 @@ namespace IPP\Interpreter;
 
 use DOMDocument;
 use DOMElement;
+use IPP\Interpreter\Classes\AttributeEntity;
 use IPP\Interpreter\Classes\BlockEntity;
 use IPP\Interpreter\Classes\ClassEntity;
 use IPP\Interpreter\Classes\ObjectEntity;
@@ -177,7 +178,7 @@ class Interpreter
                 }
             }
         }
-        //var_dump($interface->stack);
+        var_dump($interface->selfClass);
 
         if (!$isRunMethod) {
             // chybi metoda run
@@ -200,12 +201,10 @@ class Interpreter
             $receiver = $expr->send->receiver; // receiver je nejaky vyraz
             $selector = $expr->send->selector;
             $arguments = $expr->send->args;
-            $returnStuff = $this->sendMsg($receiver, $selector, $arguments, $methods, $interface);
-            return $returnStuff;
+            return $this->sendMsg($receiver, $selector, $arguments, $methods, $interface);
         } elseif ($expr->variable != null) {
             // vraci Variable pokud je to self
-            $returnObject = $this->assignTo($expr->variable, $interface);
-            return $returnObject;
+            return $this->assignTo($expr->variable, $interface);
         }
         return new ObjectEntity();
     }
@@ -305,6 +304,23 @@ class Interpreter
     }
 
     /**
+     * @param $methodName<string>
+     * @param $class<ClassEntity>
+     * @return true|false
+     */
+    public function checkMethodsToSetAttribute(string $methodName, ClassEntity $class): bool
+    {
+        foreach ($class->methods as $method) {
+            if ($method->selector == $methodName) {
+                return true;
+            }
+        }
+        if ($class->parentClassDefined) {
+            return $this->checkMethodsToSetAttribute($methodName, $class->parentClassDefined);
+        }
+        return false;
+    }
+    /**
      * Zpracuje odpovídající metodu podle selectoru, pokud tato metoda
      * ve třídě existuje, jinak vrací null, pokud metoda neexistuje
      * @param array<Method> $methods
@@ -344,8 +360,21 @@ class Interpreter
                 }
             }
         }
-
-        return null;
+        if (count($arguments) > 1 || $interface->actualClass->parentClassDefined) {
+            return null;
+        }
+        if ($this->checkMethodsToSetAttribute(trim($selector, ":"), $interface->selfClass)) {
+            throw new InterpreterError(ErrorCode::INT_INST_ATTR);
+        }
+        if (array_key_exists(trim($selector, ":"), $interface->selfClass->atributes)) {
+            $interface->selfClass->atributes[trim($selector, ":")] = $arguments[1];
+        } else {
+            // vytvoreni noveho atributu
+            $attribute = new AttributeEntity(trim($selector, ":"), $interface->selfClass, $arguments[1]);
+            $interface->selfClass->atributes[$attribute->attributeSelector] = $attribute;
+            return $attribute;
+        }
+        return $interface->selfClass->atributes[trim($selector, ":")];
     }
     /**
      * Funkce provede všechny příkazy v Bloku, pokud jsou parametry, tak si
@@ -407,6 +436,30 @@ class Interpreter
         }
         return $locals;
     }
+
+    /**
+     * Pokusi se naleznou built-in tridu, podle zadaneho nazvu,
+     * pokud exituje praci pravdivostni literal
+     * @param ClassEntity $object
+     * @param string $expectedBuiltInCls - ocekavana trida, ktera je potreba najit
+     * @return bool
+     */
+    public function checkParentForClassEntity(): \Closure
+    {
+        return function (ClassEntity $object, string $expectedBuiltInCls): bool {
+            if ($object->parentClassName == $expectedBuiltInCls) {
+                return true;
+            }
+            while ($object->parentClassDefined) {
+                $object = $object->parentClassDefined;
+                if ($object->parentClassName == $expectedBuiltInCls) {
+                    return true;
+                }
+            }
+            return false;
+        };
+    }
+
     /**
      * @param Expr $receiver - vyraz, ktery se vyhodnoti na objekt, tento objekt je prijemcem zpravy
      * @param string $selector - metoda, co budu hledat
@@ -451,16 +504,6 @@ class Interpreter
                     }
                 }
                 return $this->methodRunForSelfSuper($ret, $interface, $selector, $arguments, $tmpClass);
-
-//                if ($interface->actualClass->parentClassDefined != null) {
-//                    if ($interface->actualClass->parentClassDefined->methods != null) {
-//                        $parentMethods = $interface->actualClass->parentClassDefined->methods;
-//              // v pripade, ze je argument super, tak je zaroven i self (svuj vlastni Object, v tomto pripade trida)
-
-//                        $interface->actualClass = $interface->actualClass->parentClassDefined;
-//                        return $this->parseMethod($parentMethods, $selector, $arguments, $interface);
-//                    }
-//                }
             }
             if ($object->name == "super") {
                 // v pripade, ze je argument super, tak je zaroven i self (svuj vlastni Object, v tomto pripade trida)
@@ -487,14 +530,6 @@ class Interpreter
                 } else {
                     throw new InterpreterError(ErrorCode::SEM_UNDEF);
                 }
-
-//                if ($interface->actualClass->parentClassDefined != null) {
-//                    if ($interface->actualClass->parentClassDefined->methods != null) {
-//                        $parentMethods = $interface->actualClass->parentClassDefined->methods;
-//                        $interface->actualClass = $interface->actualClass->parentClassDefined;
-//                        return $this->parseMethod($parentMethods, $selector, $arguments, $interface);
-//                    }
-//                }
             }
             throw new InterpreterError(ErrorCode::SEM_UNDEF);
         }
@@ -565,11 +600,26 @@ class Interpreter
                         }
                     }
                 }
+                if ($object instanceof ClassEntity) {
+                    $object->value = $argument;
+                    return $object;
+                }
         }
-
-
         // Metody, ktere muze provadet String Entity
-        if ($object instanceof StringEntity) {
+        if (
+            $object instanceof StringEntity ||
+            $object instanceof ClassEntity && $object->value instanceof StringEntity
+        ) {
+            $strMethods = array("print", "asInteger", "concatenateWith:", "startsWith:endsBefore:", "length", "read");
+            if ($object instanceof ClassEntity && in_array($selector, $strMethods)) {
+                // zkontroluje danou tridu, jestli dedi ze tridy, ktera tuto operaci podporuje
+                $func = $this->checkParentForClassEntity();
+                if ($func($object, "String")) {
+                    $object = $object->value;
+                } else {
+                    throw new InterpreterError(ErrorCode::SEM_UNDEF);
+                }
+            }
             switch ($selector) {
                 case "print":
                     return $object->print();
@@ -596,7 +646,20 @@ class Interpreter
             }
         }
         // metody, ktere muze provadet IntegerEntity
-        if ($object instanceof IntegerEntity) {
+        if (
+            $object instanceof IntegerEntity ||
+            ($object instanceof ClassEntity && $object->value instanceof IntegerEntity)
+        ) {
+            $intMethods = array("asInteger", "greaterThan:", "plus:", "minus:", "multiplyBy:", "divBy:","timesRepeat:");
+            if ($object instanceof ClassEntity && in_array($selector, $intMethods)) {
+                // zkontroluje danou tridu, jestli dedi ze tridy, ktera tuto operaci podporuje
+                $func = $this->checkParentForClassEntity();
+                if ($func($object, "Integer")) {
+                    $object = $object->value;
+                } else {
+                    throw new InterpreterError(ErrorCode::SEM_UNDEF);
+                }
+            }
             switch ($selector) {
                 case "asInteger":
                     return $object->asInteger();
@@ -638,11 +701,32 @@ class Interpreter
             }
         }
 
+        if (
+            $object instanceof NilEntity ||
+            ($object instanceof ClassEntity && $object->value instanceof NilEntity)
+        ) {
+            $intMethods = array("asString", "isNil");
+            if ($object instanceof ClassEntity && in_array($selector, $intMethods)) {
+                // zkontroluje danou tridu, jestli dedi ze tridy, ktera tuto operaci podporuje
+                $func = $this->checkParentForClassEntity();
+                if ($func($object, "Nil")) {
+                    $object = $object->value;
+                } else {
+                    throw new InterpreterError(ErrorCode::SEM_UNDEF);
+                }
+            }
+            switch ($selector) {
+                case "asString":
+                    return $object->asString();
+                case "isNil":
+                    return $object->isNil();
+            }
+        }
+
         if ($object instanceof BlockEntity) {
             switch ($selector) {
                 case "value":
-                    $obj = $this->parseBlock($object, $arguments, $methods, false, $object->interface);
-                    return $obj;
+                    return $this->parseBlock($object, $arguments, $methods, false, $object->interface);
 
                 case str_repeat("value:", count($arguments)):
                     return $this->parseBlock($object, $arguments, $methods, true, $object->interface);
@@ -650,6 +734,16 @@ class Interpreter
         }
 
         if ($object instanceof TrueEntity || $object instanceof FalseEntity) {
+            $intMethods = array("not", "and:", "or:", "ifTrue:ifFalse:");
+            if (($object instanceof FalseEntity || $object instanceof TrueEntity) && in_array($selector, $intMethods)) {
+                // zkontroluje danou tridu, jestli dedi ze tridy, ktera tuto operaci podporuje
+                $func = $this->checkParentForClassEntity();
+                if ($func($object, "True") || $func($object, "False")) {
+                    $object = $object->value;
+                } else {
+                    throw new InterpreterError(ErrorCode::SEM_UNDEF);
+                }
+            }
             switch ($selector) {
                 case "not":
                     return $object->not();
