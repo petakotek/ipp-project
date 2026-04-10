@@ -393,10 +393,9 @@ def evaluate_test(
 
 
 def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
-    test_folder = Path("outputs/")
-    Path.mkdir(test_folder, parents=True, exist_ok=True)
     # PARSE ONLY
     if actual_test.test_type == TestCaseType.PARSE_ONLY:
+
         file_full_path = write_to_file(actual_test, ".sol")
 
         # spusteni prekladace solu
@@ -407,7 +406,6 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
         # uklid souboru
         Path.unlink(file_full_path, missing_ok=True)
         Path.unlink(output_file, missing_ok=True)
-        Path.rmdir(test_folder)
         if test_final_result:
             return test_final_result
 
@@ -432,7 +430,6 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
                 test_final_result.diff_output = diff.stdout
 
         Path.unlink(file_full_path, missing_ok=True)
-        Path.rmdir(test_folder)
 
         if test_final_result:
             return test_final_result
@@ -473,11 +470,8 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
             # unlink old .xml file
             Path.unlink(output_file, missing_ok=True)
             Path.unlink(file_full_path, missing_ok=True)
-            Path.rmdir(test_folder)
             if test_final_result:
                 return test_final_result
-
-    Path.rmdir(test_folder)
 
     # neocekavana chyba
     return UnexecutedReason(
@@ -509,7 +503,6 @@ def filter_tests(args: CliArguments, discovered_tests: list[TestCase]) -> list[T
     result_tests: list[TestCase] = []
     filter_applied = False
     if args.dry_run:
-        filter_applied = True
         return discovered_tests
     # pridat podle kategorie nebo jmena
     if args.include:
@@ -601,9 +594,13 @@ def process_category(
     passed_points = 0
     test_reports: dict[str, TestCaseReport] = {}
 
+    test_folder = Path("outputs/")
+    Path.mkdir(test_folder, parents=True, exist_ok=True)
+
     for test in (t for t in discovered_test_cases if t.category == category):
         total_points += test.points
         result = start_test(test)
+        start = True
 
         if isinstance(result, TestCaseReport):
             if result.result == TestResult.PASSED:
@@ -611,6 +608,12 @@ def process_category(
             test_reports[test.name] = result
         elif isinstance(result, UnexecutedReason):
             unexecuted[test.name] = result
+
+    for test in test_folder.iterdir():
+        if test.is_file():
+            test.unlink()
+
+    Path.rmdir(test_folder)
 
     return CategoryReport(
         total_points=total_points,

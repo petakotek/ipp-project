@@ -32,7 +32,6 @@ use IPP\Interpreter\Exception\ErrorCode;
 use IPP\Interpreter\Exception\InterpreterError;
 use IPP\Interpreter\InputModel\Arg;
 use IPP\Interpreter\InputModel\Block;
-use IPP\Interpreter\InputModel\ClassDef;
 use IPP\Interpreter\InputModel\Expr;
 use IPP\Interpreter\InputModel\Literal;
 use IPP\Interpreter\InputModel\Method;
@@ -40,7 +39,6 @@ use IPP\Interpreter\InputModel\Parameter;
 use IPP\Interpreter\InputModel\Program;
 use IPP\Interpreter\InputModel\Variable;
 use IPP\Interpreter\InputModel\XmlValidationException;
-use mysql_xdevapi\Expression;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use SplFileObject;
@@ -178,7 +176,7 @@ class Interpreter
                 }
             }
         }
-        var_dump($interface->selfClass);
+        //var_dump($interface->selfClass);
 
         if (!$isRunMethod) {
             // chybi metoda run

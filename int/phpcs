@@ -1,0 +1,3 @@
+#!/bin/bash
+
+php /src/vendor/bin/phpcs --standard=/src/int/phpcs.xml "$@"
