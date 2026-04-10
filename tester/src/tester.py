@@ -145,13 +145,6 @@ def parse_arguments() -> CliArguments:
         "Can be used multiple times to specify multiple accepted names. "
         "Can be combined with -ic and -i.",
     )
-    # arg_parser.add_argument(
-    #     "-g",
-    #     dest="regex_filters",
-    #     action="store_true",
-    #     help="When used, the filters specified with -i[ct]/-e[ct] will be interpreted as "
-    #     "regular expressions instead of literal strings.",
-    # )  # TODO: This is optional. If you don't want to implement it, remove this argument.
     arg_parser.add_argument(
         "-v",
         "--verbose",
@@ -375,9 +368,9 @@ def evaluate_test(
 
         # pokud neni nastaveno je to null
         if not test_result.stdout:
-            test_result.stdout = None
+            test_result.stdout = ""
         if not test_result.stderr:
-            test_result.stderr = None
+            test_result.stderr = ""
 
         return TestCaseReport(
             result=complete_result,
@@ -395,7 +388,6 @@ def evaluate_test(
 def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
     # PARSE ONLY
     if actual_test.test_type == TestCaseType.PARSE_ONLY:
-
         file_full_path = write_to_file(actual_test, ".sol")
 
         # spusteni prekladace solu
@@ -454,18 +446,18 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
             actual_test.test_type = TestCaseType.COMBINED
 
             # pokud ma test k sobe i stdout_file
-            if test_final_result:
-                if (
-                    test_final_result
-                    and test_final_result.result is not None
-                    and test_final_result.result == TestResult.PASSED
-                    and actual_test.expected_stdout_file
-                ):
-                    diff = diff_files(actual_test, result)
 
-                    if diff and diff.returncode != 0:
-                        test_final_result.result = TestResult.INTERPRETER_RESULT_DIFFERS
-                        test_final_result.diff_output = diff.stdout
+            if (
+                test_final_result
+                and test_final_result.result is not None
+                and test_final_result.result == TestResult.PASSED
+                and actual_test.expected_stdout_file
+            ):
+                diff = diff_files(actual_test, result)
+
+                if diff and diff.returncode != 0:
+                    test_final_result.result = TestResult.INTERPRETER_RESULT_DIFFERS
+                    test_final_result.diff_output = diff.stdout
 
             # unlink old .xml file
             Path.unlink(output_file, missing_ok=True)
@@ -600,7 +592,6 @@ def process_category(
     for test in (t for t in discovered_test_cases if t.category == category):
         total_points += test.points
         result = start_test(test)
-        start = True
 
         if isinstance(result, TestCaseReport):
             if result.result == TestResult.PASSED:
@@ -609,9 +600,9 @@ def process_category(
         elif isinstance(result, UnexecutedReason):
             unexecuted[test.name] = result
 
-    for test in test_folder.iterdir():
-        if test.is_file():
-            test.unlink()
+    for test_case in test_folder.iterdir():
+        if test_case.is_file():
+            test_case.unlink()
 
     Path.rmdir(test_folder)
 

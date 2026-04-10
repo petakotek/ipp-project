@@ -8,6 +8,11 @@ class AttributeEntity
     public mixed $attributeObject;
     public string $attributeSelector;
 
+    /**
+     * @param string $attributeSelector
+     * @param ClassEntity $attributeClass
+     * @param mixed $attributeObject
+     */
     public function __construct($attributeSelector, $attributeClass, $attributeObject)
     {
         $this->attributeSelector = $attributeSelector;

@@ -49,4 +49,9 @@ class ObjectEntity
     {
         return FalseEntity::getInstance();
     }
+
+    public static function new(): self
+    {
+        return new self();
+    }
 }

@@ -2,6 +2,8 @@
 
 namespace IPP\Interpreter\Classes;
 
+use IPP\Interpreter\Exception\ErrorCode;
+use IPP\Interpreter\Exception\InterpreterError;
 use SplFileObject;
 
 /**
@@ -71,11 +73,19 @@ class ProgramInterface
      * @param string $variableName
      * @return mixed
      */
-    public function searchForVariable($variableName): mixed
+    public function searchForVariable(string $variableName): mixed
     {
+        $localArray = [];
         $index = 0;
         while ($index <= $this->itemsCount) {
-            $localArray = $this->stack[$index];
+            if ($this->stack) {
+                $localArray = $this->stack[$index];
+            } else {
+                throw new InterpreterError(ErrorCode::SEM_UNDEF);
+            }
+            if ($localArray == null) {
+                throw new InterpreterError(ErrorCode::SEM_UNDEF);
+            }
             if (array_key_exists($variableName, $localArray)) {
                 return $localArray[$variableName];
             }
