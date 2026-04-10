@@ -1,0 +1,22 @@
+!I! 0
++++ ZADANI_SOL
+*** self_react.sol2
+!C! 0
+>>> 1
+
+class A : Object {
+    foo: [ :x |
+
+    u := x value: 'foo'. ]
+}
+class Main : Object {
+    run [|
+        a := A new.
+
+        b := [ :arg | y := self attr: arg. z := self. ].
+
+        c := a foo: b.
+
+        _ := (self attr) print.
+    ]
+}

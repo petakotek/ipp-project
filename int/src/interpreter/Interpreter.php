@@ -732,16 +732,6 @@ class Interpreter
         }
 
         if ($object instanceof TrueEntity || $object instanceof FalseEntity) {
-            $intMethods = array("not", "and:", "or:", "ifTrue:ifFalse:");
-            if (($object instanceof FalseEntity || $object instanceof TrueEntity) && in_array($selector, $intMethods)) {
-                // zkontroluje danou tridu, jestli dedi ze tridy, ktera tuto operaci podporuje
-                $func = $this->checkParentForClassEntity();
-                if ($func($object, "True") || $func($object, "False")) {
-                    $object = $object->value;
-                } else {
-                    throw new InterpreterError(ErrorCode::SEM_UNDEF);
-                }
-            }
             switch ($selector) {
                 case "not":
                     return $object->not();
