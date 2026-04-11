@@ -3,6 +3,11 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/int/src/interpreter" isTestSource="false" packagePrefix="IPP\Interpreter\" />
+      <sourceFolder url="file://$MODULE_DIR$/tester/.venv/lib/python3.12/site-packages" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/tester/.venv/lib/python3.14/site-packages" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/int/spec" isTestSource="true" />
+      <excludeFolder url="file://$MODULE_DIR$/sol2xml/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/tester/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/int/vendor/adhocore/cli" />
       <excludeFolder url="file://$MODULE_DIR$/int/vendor/composer" />
       <excludeFolder url="file://$MODULE_DIR$/int/vendor/monolog/monolog" />
@@ -11,7 +16,7 @@
       <excludeFolder url="file://$MODULE_DIR$/int/vendor/spaze/phpstan-disallowed-calls" />
       <excludeFolder url="file://$MODULE_DIR$/int/vendor/squizlabs/php_codesniffer" />
     </content>
-    <orderEntry type="jdk" jdkName="3.12 WSL (Ubuntu-24.04): (/home/xkotekp00/rocnik2/ipp/project/tester/.venv/bin/python3.12)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="WSL (Ubuntu-24.04): (/home/xkotekp00/rocnik2/ipp/project/tester/.venv/bin/python3.14)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

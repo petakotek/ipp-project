@@ -13,7 +13,7 @@ class ObjectEntity
     }
     public function identicalTo(object $target): TrueEntity | FalseEntity
     {
-        if ($this instanceof $target) {
+        if (get_class($this) === get_class($target)) {
             return new TrueEntity();
         }
         return new FalseEntity();
@@ -48,5 +48,10 @@ class ObjectEntity
     public function isBoolean(): FalseEntity | TrueEntity
     {
         return FalseEntity::getInstance();
+    }
+
+    public static function new(): self
+    {
+        return new self();
     }
 }

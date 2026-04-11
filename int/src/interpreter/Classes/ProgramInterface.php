@@ -2,6 +2,8 @@
 
 namespace IPP\Interpreter\Classes;
 
+use IPP\Interpreter\Exception\ErrorCode;
+use IPP\Interpreter\Exception\InterpreterError;
 use SplFileObject;
 
 /**
@@ -10,6 +12,9 @@ use SplFileObject;
  */
 class ProgramInterface
 {
+    /**
+     * @var array<mixed> $stack
+     */
     public array $stack = [];
     public int $itemsCount = 0;
 
@@ -19,7 +24,8 @@ class ProgramInterface
 
     public ?ClassEntity $selfClass;
 
-    public function __construct(ClassEntity $actualClass, ?SplFileObject $file){
+    public function __construct(ClassEntity $actualClass, ?SplFileObject $file)
+    {
         $this->actualClass = $actualClass;
         if ($file != null) {
             $this->fileEntered = true;
@@ -28,13 +34,20 @@ class ProgramInterface
         $this->file = $file;
     }
 
-    public function push(array $item) {
+    /**
+     * Funkce vlozi pole promennych na zasobnik
+     * @param array<mixed> $item
+     * @return void
+     */
+    public function push(array $item): void
+    {
         $this->itemsCount++;
         // pridani polozky na zacatek pole
         array_unshift($this->stack, $item);
     }
 
-    public function pop() : ?array {
+    public function pop(): mixed
+    {
         if ($this->itemsCount === 0) {
             return null;
         }
@@ -42,23 +55,38 @@ class ProgramInterface
         return array_shift($this->stack);
     }
 
-    public function top() : array {
+    public function top(): mixed
+    {
         if ($this->itemsCount != 0) {
             return current($this->stack);
         }
         return array();
     }
 
-    public function isEmpty() : bool {
+    public function isEmpty(): bool
+    {
         return $this->itemsCount <= 0;
     }
 
-    /// Pokud promenna existuje, tak ji najde v nadblocich
-    public function searchForVariable($variableName) : mixed {
+    /**
+     * Pokud promenna existuje, tak ji najde v nadblocich
+     * @param string $variableName
+     * @return mixed
+     */
+    public function searchForVariable(string $variableName): mixed
+    {
+        $localArray = [];
         $index = 0;
         while ($index <= $this->itemsCount) {
-            $localArray = $this->stack[$index];
-            if (array_key_exists($variableName, $localArray)){
+            if ($this->stack) {
+                $localArray = $this->stack[$index];
+            } else {
+                throw new InterpreterError(ErrorCode::SEM_UNDEF);
+            }
+            if ($localArray == null) {
+                throw new InterpreterError(ErrorCode::SEM_UNDEF);
+            }
+            if (array_key_exists($variableName, $localArray)) {
                 return $localArray[$variableName];
             }
             $index++;
@@ -73,14 +101,14 @@ class ProgramInterface
      * @param $value mixed prommene, ktera bude aktualizovana
      * @return void funkce nic nevraci, pouze dela svou praci
      */
-    public function updateVariableContextInUpperBlocks(string $variableName,mixed $value) : void {
+    public function updateVariableContextInUpperBlocks(string $variableName, mixed $value): void
+    {
         $index = 0;
         while ($index <= $this->itemsCount - 1) {
             $localArray = $this->stack[$index];
             if (array_key_exists($variableName, $localArray)) {
                 $localArray[$variableName] = $value;
                 $this->stack[$index] = $localArray;
-
             }
             $index++;
         }
