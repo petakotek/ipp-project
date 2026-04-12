@@ -26,22 +26,14 @@ COPY int/composer.lock /tmp/composer.lock
 RUN mkdir -p /src/vendor
 RUN cd /tmp && composer install --no-interaction --no-progress && mv vendor /src
 
-RUN echo '#!/bin/bash\n\
-\
-chmod +x /src/int/phpstan /src/int/phpcs 2>/dev/null\n\
-chmod +x /src/tester/mypy 2>/dev/null\n\
-chmod +x /src/tester/ruff 2>/dev/null\n\
-\
-exec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
+RUN printf '#!/bin/bash\nchmod +x /src/int/phpstan /src/int/phpcs 2>/dev/null\nchmod +x /src/tester/mypy /src/tester/ruff 2>/dev/null\n' > /setup.sh && chmod +x /setup.sh
 
-ENTRYPOINT ["/entrypoint.sh"]
-
-CMD ["/bin/bash"]
+ENTRYPOINT ["/bin/bash"]
 
 
 FROM php:8.5-cli-bookworm AS runtime
 
-WORKDIR /interpreter
+WORKDIR /int
 COPY int/ .
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -54,32 +46,30 @@ RUN composer install --no-interaction --no-progress --no-dev --optimize-autoload
 
 ENTRYPOINT ["/usr/local/bin/php", "src/solint.php"]
 
-FROM python:3.14-slim-bookworm AS test
+FROM runtime AS test
 
-WORKDIR /int
-COPY /int .
+COPY --from=python:3.14-slim-bookworm /usr/local/bin/python3.14 /usr/local/bin/python3.14
+COPY --from=python:3.14-slim-bookworm /usr/local/lib/python3.14 /usr/local/lib/python3.14
+COPY --from=python:3.14-slim-bookworm /usr/local/lib/libpython3.14.so.1.0 /usr/local/lib/libpython3.14.so.1.0
+COPY --from=python:3.14-slim-bookworm /usr/local/bin/pip3 /usr/local/bin/pip3
+COPY --from=python:3.14-slim-bookworm /usr/local/include/python3.14 /usr/local/include/python3.14
+
+RUN ln -s /usr/local/bin/php /usr/bin/php
+RUN ln -s /usr/local/bin/python3.14 /usr/bin/python
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    php-cli \
-    php-xml \
-    php-mbstring \
-    curl \
-    unzip \
     gcc \
     libxml2-dev \
     libxslt-dev \
     zlib1g-dev \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-
-RUN composer install --no-interaction --no-progress --no-dev --optimize-autoloader
-
-WORKDIR /test
+WORKDIR /tester
 COPY tester/ .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-WORKDIR /test/src
+WORKDIR /tester/src
 
 ENTRYPOINT ["/usr/local/bin/python3.14", "tester.py"]
