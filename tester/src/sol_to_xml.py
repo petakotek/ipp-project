@@ -8,7 +8,7 @@ from lark import Lark, Transformer, LarkError
 from lxml import etree
 from lxml.etree import tostring, indent
 
-grammar = r"""
+grammar = r'''
 COMMENT: /"([^"\\]|\\.)*"/
 
 STR: /'([^'\\]|\\.)*'/
@@ -29,7 +29,6 @@ selector: ID ":" (ID ":")*    -> selector
 block: "[" block_body "]"
 
 ?block_body: block_par "|" block_stat    -> param_block
-           | block_stat                  -> stat_block
 
 block_par: (":" ID)*
 
@@ -52,17 +51,15 @@ expr_sel: (ID ":" expr_base)+
           
 %ignore COMMENT
 %ignore /\s+/
-"""
+'''
 
 
-# Utility to escape the handful of problematic XML characters
-def xml_escape(s: str) -> str:
+# The SOL26 string escape characters should be already evaluated in the XML
+def process_escaped_entities(s: str) -> str:
     return (
-        s.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&apos;")
+        s.replace("\\n", "\n")
+        .replace("\\\\", "\\")
+        .replace("\\'", "'")
     )
 
 
@@ -87,18 +84,30 @@ class SolTransformer(Transformer):
         for ch in children:
             if isinstance(ch, dict) and ch.get("kind") == "class_def":
                 classes.append(ch)
-        return {"type": "program", "classes": classes}
+        return {
+            "type": "program",
+            "classes": classes
+        }
 
     def class_def(self, kids):
         # kids: [CID, CID, method*, possibly 0 or more methods]
         cname = kids[0]  # str name of the class
         parent = kids[1]  # str name of parent
         methods = kids[2:]  # list of method dicts
-        return {"kind": "class_def", "cname": cname, "parent": parent, "methods": methods}
+        return {
+            "kind": "class_def",
+            "cname": cname,
+            "parent": parent,
+            "methods": methods
+        }
 
     def method(self, kids):
         # kids[0] is a selector dict, kids[1] is a block
-        return {"kind": "method", "selector": kids[0], "block": kids[1]}
+        return {
+            "kind": "method",
+            "selector": kids[0],
+            "block": kids[1]
+        }
 
     def selector_nopar(self, kids):
         # single ID
@@ -106,7 +115,7 @@ class SolTransformer(Transformer):
             "type": "selector",
             "base": kids[0],  # the selector name
             "params": [],
-            "full": kids[0],  # e.g. "run"
+            "full": kids[0]  # e.g. "run"
         }
 
     def selector(self, kids):
@@ -115,12 +124,17 @@ class SolTransformer(Transformer):
         params = kids[1:]
         # e.g. base='compute', params=['and','and']
         # full = 'compute:and:and:'
-        colon_tail = ":".join(params)
+        colon_tail = ':'.join(params)
         if colon_tail:
             full_selector = f"{base}:{colon_tail}:"
         else:
             full_selector = f"{base}:"
-        return {"type": "selector", "base": base, "params": params, "full": full_selector}
+        return {
+            "type": "selector",
+            "base": base,
+            "params": params,
+            "full": full_selector
+        }
 
     def block(self, kids):
         # single child: block_body
@@ -128,11 +142,11 @@ class SolTransformer(Transformer):
 
     def param_block(self, kids):
         # kids[0] is a list of param IDs, kids[1] is the statement list
-        return {"type": "block", "params": kids[0], "stats": kids[1]}
-
-    def stat_block(self, kids):
-        # only statements
-        return {"type": "block", "params": [], "stats": kids}
+        return {
+            "type": "block",
+            "params": kids[0],
+            "stats": kids[1]
+        }
 
     def block_par(self, kids):
         # each child is an ID
@@ -140,18 +154,29 @@ class SolTransformer(Transformer):
 
     def assignment(self, kids):
         # kids: [var ID, expr dict]
-        return {"type": "assign", "var": kids[0], "expr": kids[1]}
+        return {
+            "type": "assign",
+            "var": kids[0],
+            "expr": kids[1]
+        }
 
     def expr(self, kids):
         if len(kids) == 1:
             return kids[0]  # single subexpression
         else:
             # msg_send with a 'tail'
-            return {"type": "msg_send", "receiver": kids[0], "tail": kids[1]}
+            return {
+                "type": "msg_send",
+                "receiver": kids[0],
+                "tail": kids[1]
+            }
 
     def simple_tail(self, kids):
         # e.g. "asString" with no arguments
-        return {"type": "simple_tail", "name": kids[0]}
+        return {
+            "type": "simple_tail",
+            "name": kids[0]
+        }
 
     def expr_sel(self, kids):
         # pairs of ID and expr_base
@@ -166,7 +191,11 @@ class SolTransformer(Transformer):
 
     def int(self, kids):
         val_str = str(kids[0])
-        return {"type": "literal", "class": "Integer", "value": val_str}
+        return {
+            "type": "literal",
+            "class": "Integer",
+            "value": val_str
+        }
 
     def str(self, kids):
         # kids[0] is the token, e.g. 'some string'
@@ -175,25 +204,48 @@ class SolTransformer(Transformer):
         s_val = raw[1:-1]
         # unescape the usual combos if needed - should not be done (see specification of XML)
         # s_val = s_val.replace("\\n", "\n").replace("\\\\", "\\").replace("\\'", "'")
-        return {"type": "literal", "class": "String", "value": s_val}
+        return {
+            "type": "literal",
+            "class": "String",
+            "value": s_val
+        }
 
     def id(self, kids):
         # could be "nil" or "true"/"false", or a normal var
         name = kids[0]
         if name == "nil":
-            return {"type": "literal", "class": "Nil", "value": "nil"}
+            return {
+                "type": "literal",
+                "class": "Nil",
+                "value": "nil"
+            }
         elif name == "true":
-            return {"type": "literal", "class": "True", "value": "true"}
+            return {
+                "type": "literal",
+                "class": "True",
+                "value": "true"
+            }
         elif name == "false":
-            return {"type": "literal", "class": "False", "value": "false"}
+            return {
+                "type": "literal",
+                "class": "False",
+                "value": "false"
+            }
         else:
             # normal variable reference
-            return {"type": "var", "name": name}
+            return {
+                "type": "var",
+                "name": name
+            }
 
     def cid(self, kids):
         # Uppercase IDs are class references => we treat them as a literal with class="class"
         c_name = kids[0]
-        return {"type": "literal", "class": "class", "value": c_name}
+        return {
+            "type": "literal",
+            "class": "class",
+            "value": c_name
+        }
 
     def block_expr(self, kids):
         # we have a nested block inside an expression
@@ -205,7 +257,6 @@ class SolTransformer(Transformer):
 # Build the XML according to the rules:
 #
 
-
 def build_xml_program(ast, first_comment):
     """
     ast: { "type":"program", "classes":[...] }
@@ -216,7 +267,7 @@ def build_xml_program(ast, first_comment):
     # Root element
     root = etree.Element("program", {"language": "SOL26"})
     if first_comment:
-        root.set("description", first_comment.replace("\n", "\x0a"))
+        root.set("description", first_comment.replace("\n", "\x0A"))
 
     # For each class in ast["classes"], build <class> subelements
 
@@ -288,9 +339,12 @@ def build_xml_expr(expr_ast):
         # <literal class="..." value="..."/>
         lit_elem = etree.Element("literal")
         lit_elem.set("class", expr_ast["class"])
-        # Escape the value for XML - should not be done (otherwise escaping escaped character)
-        # val = xml_escape(expr_ast["value"])
-        lit_elem.set("value", expr_ast["value"])
+        
+        val = expr_ast["value"]
+        if expr_ast["class"] == "String":
+            val = process_escaped_entities(val)
+
+        lit_elem.set("value", val)
         return lit_elem
     elif etype == "var":
         # <var name="..."/>
@@ -350,17 +404,16 @@ def build_xml_expr(expr_ast):
 
 def find_first_comment(text):
     match = re.search(r"\"((.|\n)*?)\"", text)
-    if match is None:
-        return None
+    if match is None: return None
     return match.group(1)
 
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 try:
-    with open(os.path.join(script_dir, "parser_output_schema.xsd")) as xsd_f:
+    with open(os.path.join(script_dir, 'parser_output_schema.xsd')) as xsd_f:
         sol_schema = etree.XMLSchema(file=xsd_f)
 except IOError:
-    print("Schema not found, will not validate", file=sys.stderr)
+    print('Schema not found, will not validate', file=sys.stderr)
     sol_schema = None
 
 
@@ -368,7 +421,7 @@ def validate(xml_string: str) -> str | None:
     if sol_schema is None:
         return None
     try:
-        xml_doc = etree.fromstring(xml_string.encode("utf-8"))
+        xml_doc = etree.fromstring(xml_string.encode('utf-8'))
         sol_schema.assertValid(xml_doc)
         return None
     except (etree.DocumentInvalid, etree.XMLSyntaxError) as e:
@@ -391,7 +444,7 @@ def convert_to_xml(sol_program: str) -> str:
 
 
 def main():
-    source_file = "example.sol"
+    source_file = None
     if len(sys.argv) > 1:
         source_file = sys.argv[-1]
 
@@ -407,7 +460,7 @@ def main():
 
         validation_result = validate(xml_str)
         if validation_result is not None:
-            print("Generated XML does not conform to the schema:", file=sys.stderr)
+            print('Generated XML does not conform to the schema:', file=sys.stderr)
             print(validation_result, file=sys.stderr)
             exit(2)
     except LarkError as e:
