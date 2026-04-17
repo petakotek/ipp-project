@@ -415,6 +415,8 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
             and test_final_result.result == TestResult.PASSED
             and actual_test.expected_stdout_file
         ):
+            if test_final_result.interpreter_exit_code != 0:
+                return test_final_result
             diff = diff_files(actual_test, result)
 
             if diff and diff.returncode != 0:
@@ -453,6 +455,8 @@ def start_test(actual_test: TestCase) -> TestCaseReport | UnexecutedReason:
                 and test_final_result.result == TestResult.PASSED
                 and actual_test.expected_stdout_file
             ):
+                if test_final_result.interpreter_exit_code != 0:
+                    return test_final_result
                 diff = diff_files(actual_test, result)
 
                 if diff and diff.returncode != 0:
