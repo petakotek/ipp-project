@@ -80,6 +80,9 @@ final class IntegerEntity extends ObjectEntity implements Instantiable
     }
     public static function from(mixed $parameter): static
     {
-        return new self($parameter);
+        if (is_int($parameter)) {
+            return new self($parameter);
+        }
+        throw new InterpreterError(ErrorCode::INT_INVALID_ARG);
     }
 }

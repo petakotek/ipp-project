@@ -361,7 +361,7 @@ class Interpreter
                 }
             }
         }
-        if (count($arguments) > 1 || $interface->actualClass->parentClassDefined) {
+        if (count($arguments) < 1 || count($arguments) > 1 || $interface->actualClass->parentClassDefined) {
             return null;
         }
         if ($interface->selfClass) {
@@ -370,7 +370,7 @@ class Interpreter
             }
         }
         if ($interface->selfClass === null || $interface->selfClass->atributes === null) {
-            throw new InterpreterError(ErrorCode::SEM_UNDEF);
+            throw new InterpreterError(ErrorCode::INT_DNU);
         }
         if (array_key_exists(trim($selector, ":"), $interface->selfClass->atributes)) {
             $interface->selfClass->atributes[trim($selector, ":")] = $arguments[1];
@@ -435,7 +435,7 @@ class Interpreter
     {
         $locals = [];
         if (count($parameters) != count($arguments)) {
-            throw new InterpreterError(ErrorCode::INT_INST_ATTR);
+            throw new InterpreterError(ErrorCode::SEM_ARITY);
         }
         foreach ($parameters as $parameter) {
             $locals[$parameter->name] = $arguments[$parameter->order];
@@ -636,10 +636,10 @@ class Interpreter
 
                     return $this->methodRunForSelfSuper($ret, $interface, $selector, $arguments, $tmpClass);
                 } else {
-                    throw new InterpreterError(ErrorCode::SEM_UNDEF);
+                    throw new InterpreterError(ErrorCode::INT_DNU);
                 }
             }
-            throw new InterpreterError(ErrorCode::SEM_UNDEF);
+            throw new InterpreterError(ErrorCode::INT_DNU);
         }
 
         // Metody, ktere muze provadet String Entity
